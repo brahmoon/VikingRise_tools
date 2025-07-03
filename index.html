@@ -112,7 +112,7 @@
     function calculate() {
       const grade = parseInt(document.getElementById("grade").value);
       const stage = selectedStars;
-      const owned = parseInt(document.getElementById("owned").value);
+      const owned = document.getElementById("owned").value ? parseInt(document.getElementById("owned").value) : 0;
       const currentTotal = shardTable[grade - 1][stage - 1];
       const needed = Math.max(0, maxShard - currentTotal - owned);
       document.getElementById("result").textContent = `覚醒まで残り${needed}枚必要`;
