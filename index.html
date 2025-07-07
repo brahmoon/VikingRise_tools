@@ -73,9 +73,11 @@
     <span class="stars" data-value="5">☆</span>
   </div>
 
-  <label for="owned">保有している欠片の数：</label>
+  <label for="owned">保有している英雄欠片の数：</label>
   <input type="number" id="owned" min="0" />
-
+  <label for="owned-general">保有している汎用欠片の数：</label>
+  <input type="number" id="owned-general" min="0" />
+  
   <button onclick="calculate()">計算</button>
 
   <div id="result"></div>
@@ -113,8 +115,9 @@
       const grade = parseInt(document.getElementById("grade").value);
       const stage = selectedStars;
       const owned = document.getElementById("owned").value ? parseInt(document.getElementById("owned").value) : 0;
+      const owned_general = document.getElementById("owned-general").value ? parseInt(document.getElementById("owned-general").value) : 0;
       const currentTotal = shardTable[grade - 1][stage - 1];
-      const needed = Math.max(0, maxShard - currentTotal - owned);
+      const needed = Math.max(0, maxShard - currentTotal - owned - owned_general);
       document.getElementById("result").textContent = `覚醒まで残り${needed}枚必要`;
     }
 
