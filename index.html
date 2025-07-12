@@ -6,10 +6,12 @@
   <script>
     // 対応する言語コード（必要に応じて追加）
     const langMap = {
+      ar: 'ar',
       ja: 'ja',
       en: 'en',
       ru: 'ru',
       id: 'id',
+      zh-tw: 'zh-tw',
     };
 
     const userLang = (navigator.language || navigator.userLanguage).toLowerCase(); // ex: 'ja', 'en-US'
@@ -22,11 +24,12 @@
 </head>
 <body>
   <noscript>
-    JavaScriptが無効のため、言語判定が行えません。<br>
-    <a href="en/index.html">English</a> /
-    <a href="id/index.html">Indonesia</a> /
-    <a href="ja/index.html">日本語</a> /
-    <a href="ru/index.html">Русский</a>
+    <a href="ar/index.html">العربية</a>
+　　<a href="en/index.html">English</a> /
+　　<a href="id/index.html">Indonesia</a> /
+　　<a href="ja/index.html">日本語</a> /
+　　<a href="ru/index.html">Русский</a> /
+　　<a href="zh-tw/index.html">繁體中文</a> /
   </noscript>
 </body>
 </html>
