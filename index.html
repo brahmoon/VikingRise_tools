@@ -11,11 +11,13 @@
       en: 'en',
       ru: 'ru',
       id: 'id',
-      zh: 'zh-tw',
+      'zh-tw': 'zh-tw',
     };
 
     const userLang = (navigator.language || navigator.userLanguage).toLowerCase(); // ex: 'ja', 'en-US'
-    const baseLang = userLang.split('-')[0]; // ex: 'en-US' → 'en'
+    if (userLang.match('en.*')) {
+      const baseLang = userLang.split('-')[0]; // ex: 'en-US' → 'en'
+    }
     const redirectLang = langMap[baseLang] || 'en'; // fallback to English
 
     // 自動リダイレクト
