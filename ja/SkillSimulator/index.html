@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>スキル発動タイムライン</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f9f9f9;
+      margin: 20px;
+    }
+    #controls {
+      margin-bottom: 10px;
+    }
+    input[type="text"] {
+      padding: 6px;
+      font-size: 14px;
+      width: 200px;
+    }
+    button {
+      padding: 6px 12px;
+      font-size: 14px;
+      margin-left: 10px;
+      background-color: #e74c3c;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    datalist option {
+      font-size: 14px;
+    }
+    #svgContainer {
+      overflow-x: auto;
+      border: 1px solid #ccc;
+      background: #fff;
+    }
+    svg {
+      min-width: 1000px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="controls">
+  <input type="text" id="skillInput" list="skillList" placeholder="スキル名で検索">
+  <datalist id="skillList"></datalist>
+  <button onclick="addSkill()">追加</button>
+</div>
+
+<div id="svgContainer">
+  <svg id="timeline" height="100"></svg>
+</div>
+
+<script>
+  const totalSeconds = 60;
+  const spacing = 35;
+  const marginLeft = 100;
+  const svg = document.getElementById("timeline");
+  const svgWidth = 1000; // 固定サイズ（min-widthに合わせて）
+  svg.setAttribute("width", svgWidth);
+
+  const allSkills = [
+    { name: "スキルA", repeat: 1, interval: 6, effectDuration: 3, color: "#e74c3c" },
+    { name: "スキルB", repeat: 1, interval: 9, effectDuration: 5, color: "#3498db" },
+    { name: "スキルC", repeat: 0, interval: 0, effectDuration: 30, color: "#8e44ad" },
+    { name: "骨を砕く矢", repeat: 1, interval: 6, effectDuration: 3, color: "#f39c12" },
+    { name: "ヴェノムアグレゲーション", repeat: 1, interval: 9, effectDuration: 3, color: "#27ae60" }
+  ];
+
+  let displayedSkills = [];
+
+  const skillInput = document.getElementById("skillInput");
+  const skillList = document.getElementById("skillList");
+
+  // タイムライン背景描画
+  function drawTimelineBase() {
+    svg.innerHTML = "";
+    for (let sec = 0; sec <= totalSeconds; sec++) {
+      const x = marginLeft + (sec / totalSeconds) * (svgWidth - marginLeft - 20);
+      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+      line.setAttribute("x1", x);
+      line.setAttribute("y1", 0);
+      line.setAttribute("x2", x);
+      line.setAttribute("y2", 1000);
+      line.setAttribute("stroke", "#eee");
+      svg.appendChild(line);
+
+      const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      label.setAttribute("x", x - 5);
+      label.setAttribute("y", 12);
+      label.setAttribute("font-size", "9");
+      label.setAttribute("fill", "#999");
+      label.textContent = `${sec}s`;
+      svg.appendChild(label);
+    }
+  }
+
+  drawTimelineBase();
+
+  // 候補表示更新
+  skillInput.addEventListener("input", () => {
+    const query = skillInput.value.toLowerCase();
+    skillList.innerHTML = "";
+    allSkills.forEach(skill => {
+      if (skill.name.toLowerCase().includes(query)) {
+        const option = document.createElement("option");
+        option.value = skill.name;
+        skillList.appendChild(option);
+      }
+    });
+  });
+
+  function drawBlock(start, duration, y, color) {
+    const xStart = marginLeft + (start / totalSeconds) * (svgWidth - marginLeft - 20);
+    const blockWidth = (duration / totalSeconds) * (svgWidth - marginLeft - 20);
+
+    const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    rect.setAttribute("x", xStart);
+    rect.setAttribute("y", y - 12);
+    rect.setAttribute("width", blockWidth);
+    rect.setAttribute("height", 24);
+    rect.setAttribute("fill", color);
+    rect.setAttribute("rx", 4);
+    svg.appendChild(rect);
+    return rect;
+  }
+
+  function addSkill() {
+    const name = skillInput.value.trim();
+    if (!name) return;
+
+    const skill = allSkills.find(s => s.name === name);
+    if (!skill) return;
+
+    const index = displayedSkills.length;
+    const y = (index + 1) * spacing;
+
+    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    group.setAttribute("data-index", index);
+    group.setAttribute("data-skill", skill.name);
+
+    const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    label.setAttribute("x", 10);
+    label.setAttribute("y", y + 5);
+    label.setAttribute("font-size", "13");
+    label.setAttribute("fill", "#333");
+    label.textContent = skill.name;
+    group.appendChild(label);
+
+    const del = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    del.setAttribute("x", 80);
+    del.setAttribute("y", y + 5);
+    del.setAttribute("font-size", "13");
+    del.setAttribute("fill", "#e74c3c");
+    del.setAttribute("cursor", "pointer");
+    del.textContent = "×";
+    del.addEventListener("click", () => {
+      displayedSkills.splice(index, 1);
+      redraw();
+    });
+    group.appendChild(del);
+    svg.appendChild(group);
+
+    const blocks = [];
+    if (skill.repeat === 1) {
+      for (let t = skill.interval; t <= totalSeconds; t += skill.interval) {
+        const block = drawBlock(t, skill.effectDuration, y, skill.color);
+        blocks.push(block);
+      }
+    } else {
+      const block = drawBlock(skill.interval || 0, skill.effectDuration, y, skill.color);
+      blocks.push(block);
+    }
+
+    displayedSkills.push({ skill, group, blocks });
+
+    skillInput.value = "";
+    skillList.innerHTML = "";
+
+    // ▼ 候補再表示用に一度blurして再focus
+    skillInput.blur();
+    setTimeout(() => skillInput.focus(), 0);
+
+    svg.setAttribute("height", (displayedSkills.length + 1) * spacing + 50);
+  }
+
+  function redraw() {
+    drawTimelineBase();
+    const previous = [...displayedSkills];
+    displayedSkills = [];
+    previous.forEach(({ skill }) => {
+      skillInput.value = skill.name;
+      addSkill();
+    });
+  }
+</script>
+
+</body>
+</html>
