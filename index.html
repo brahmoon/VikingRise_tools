@@ -17,6 +17,8 @@
     const userLang = (navigator.language || navigator.userLanguage).toLowerCase(); // ex: 'ja', 'en-US'
     if (userLang.match('en.*')) {
       const baseLang = userLang.split('-')[0]; // ex: 'en-US' → 'en'
+    } else {
+      const baseLang = userLang
     }
     const redirectLang = langMap[baseLang] || 'en'; // fallback to English
 
