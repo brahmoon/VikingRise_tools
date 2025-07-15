@@ -15,11 +15,7 @@
     };
 
     const userLang = (navigator.language || navigator.userLanguage).toLowerCase(); // ex: 'ja', 'en-US'
-    if (userLang.match('en.*')) {
-      const baseLang = userLang.split('-')[0]; // ex: 'en-US' → 'en'
-    } else {
-      const baseLang = userLang
-    }
+    const baseLang = userLang.match('en.*') ? userLang.split('-')[0] : userLang
     const redirectLang = langMap[baseLang] || 'en'; // fallback to English
 
     // 自動リダイレクト
