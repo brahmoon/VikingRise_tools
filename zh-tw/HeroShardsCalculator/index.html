@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>英雄碎片計算器（SX）</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background-color: #fdfdfd;
+      margin: 0;
+      padding: 2rem;
+      color: #333;
+    }
+    label {
+      font-weight: bold;
+      margin-top: 1rem;
+      display: block;
+    }
+    select, input[type="number"] {
+      width: 100%;
+      padding: 0.5rem;
+      margin-top: 0.5rem;
+      margin-bottom: 1rem;
+      font-size: 1rem;
+    }
+    .stars {
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: #ccc;
+    }
+    .star-filled {
+      color: #f39c12;
+    }
+    button {
+      background-color: #e74c3c;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      font-size: 1rem;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #c0392b;
+    }
+    #result {
+      margin-top: 1.5rem;
+      font-size: 1.2rem;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>英雄碎片計算器（SX）</h1>
+
+  <label for="grade">目前英雄等級：</label>
+  <select id="grade">
+    <option value="1">等級 1</option>
+    <option value="2">等級 2</option>
+    <option value="3">等級 3</option>
+    <option value="4">等級 4</option>
+    <option value="5">等級 5</option>
+    <option value="6">等級 6</option>
+  </select>
+
+  <label>目前天賦等級：</label>
+  <div id="stars">
+    <span class="stars" data-value="1">☆</span>
+    <span class="stars" data-value="2">☆</span>
+    <span class="stars" data-value="3">☆</span>
+    <span class="stars" data-value="4">☆</span>
+    <span class="stars" data-value="5">☆</span>
+  </div>
+
+  <label for="owned">擁有的英雄碎片：</label>
+  <input type="number" id="owned" min="0" />
+  <label for="owned-general">擁有的一般碎片：</label>
+  <input type="number" id="owned-general" min="0" />
+  
+  <button onclick="calculate()">計算</button>
+
+  <div id="result"></div>
+
+  <script>
+    const shardTable = [
+      [10, 30, 50, 70, 90],
+      [105, 125, 145, 165, 185],
+      [210, 245, 280, 315, 350],
+      [390, 425, 460, 495, 530],
+      [580, 645, 710, 775, 840],
+      [910, 980, 1050, 1120, 1200]
+    ];
+
+    const maxShard = 1200;
+
+    const stars = document.querySelectorAll(".stars");
+    let selectedStars = 1;
+
+    stars.forEach(star => {
+      star.addEventListener("click", () => {
+        selectedStars = parseInt(star.getAttribute("data-value"));
+        updateStars(selectedStars);
+      });
+    });
+
+    function updateStars(count) {
+      stars.forEach((star, index) => {
+        star.textContent = index < count ? "★" : "☆";
+        star.classList.toggle("star-filled", index < count);
+      });
+    }
+
+    function calculate() {
+      const grade = parseInt(document.getElementById("grade").value);
+      const stage = selectedStars;
+      const owned = document.getElementById("owned").value ? parseInt(document.getElementById("owned").value) : 0;
+      const owned_general = document.getElementById("owned-general").value ? parseInt(document.getElementById("owned-general").value) : 0;
+      const currentTotal = shardTable[grade - 1][stage - 1];
+      const needed = Math.max(0, maxShard - currentTotal - owned - owned_general);
+      document.getElementById("result").textContent = `距離覺醒還差 ${needed} 個碎片`;
+    }
+
+    updateStars(selectedStars);
+  </script>
+</body>
+</html>
