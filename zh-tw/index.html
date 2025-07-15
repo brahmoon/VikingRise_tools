@@ -3,6 +3,30 @@
 <head>
   <meta charset="UTF-8" />
   <title>VR 工具</title>
+  <script>
+  // 現在の言語をURLパスから取得（例: /ja/tool1/index.html → 'ja'）
+  const currentLang = location.pathname.split('/')[1];
+
+  fetch('/<project-name>/lang-switcher.html')
+    .then(res => res.text())
+    .then(html => {
+      const temp = document.createElement('div');
+      temp.innerHTML = html;
+
+      const links = temp.querySelectorAll('[data-lang]');
+      links.forEach(link => {
+        if (link.dataset.lang === currentLang) {
+          link.remove();
+        }
+      });
+
+      const filteredLinks = Array.from(temp.querySelectorAll('[data-lang]'))
+        .map(link => link.outerHTML)
+        .join(' / ');
+
+      document.getElementById('lang-switcher-container').innerHTML = filteredLinks;
+    });
+</script>
 </head>
 <body>
   <h1>VikingRise 工具</h1>
@@ -12,7 +36,7 @@
   <hr />
   <div>
     言語切替：
-    <a href="../ar/index.html">العربية</a> / <a href="../en/index.html">English</a> / <a href="../id/index.html">Indonesia</a> / <a href="../ja/index.html">日本語</a> / <a href="../ru/index.html">Русский</a>
+    <div id="lang-switcher-container"></div>
   </div>
 </body>
 </html>
