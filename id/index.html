@@ -3,6 +3,29 @@
 <head>
   <meta charset="UTF-8" />
   <title>Alat VikingRise</title>
+  <script>
+  const currentLang = location.pathname.split('/')[2];
+
+  fetch('../lang-switcher.html')
+    .then(res => res.text())
+    .then(html => {
+      const temp = document.createElement('div');
+      temp.innerHTML = html;
+
+      const links = temp.querySelectorAll('[data-lang]');
+      links.forEach(link => {
+        if (link.dataset.lang === currentLang) {
+          link.remove();
+        }
+      });
+
+      const filteredLinks = Array.from(temp.querySelectorAll('[data-lang]'))
+        .map(link => link.outerHTML)
+        .join(' / ');
+
+      document.getElementById('lang-switcher-container').innerHTML = filteredLinks;
+    });
+  </script>
 </head>
 <body>
   <h1>Daftar Alat VikingRise</h1>
@@ -12,7 +35,7 @@
   <hr />
   <div>
     Ganti Bahasa:
-    <a href="../en/index.html">English</a> / <a href="../ja/index.html">日本語</a> / <a href="../ru/index.html">Русский</a>
+    <div id="lang-switcher-container"></div>
   </div>
 </body>
 </html>
