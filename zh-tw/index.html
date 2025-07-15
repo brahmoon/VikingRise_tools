@@ -6,7 +6,7 @@
   <script>
   const currentLang = location.pathname.split('/')[2];
 
-  fetch('/<project-name>/lang-switcher.html')
+  fetch('../lang-switcher.html')
     .then(res => res.text())
     .then(html => {
       const temp = document.createElement('div');
