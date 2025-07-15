@@ -4,8 +4,7 @@
   <meta charset="UTF-8" />
   <title>VR 工具</title>
   <script>
-  // 現在の言語をURLパスから取得（例: /ja/tool1/index.html → 'ja'）
-  const currentLang = location.pathname.split('/')[1];
+  const currentLang = location.pathname.split('/')[2];
 
   fetch('/<project-name>/lang-switcher.html')
     .then(res => res.text())
