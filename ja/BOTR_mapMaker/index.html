@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>マップ配置ツール（矩形指定）</title>
+  <title>マップ配置ツール（スケーリング対応）</title>
   <style>
     body {
       font-family: sans-serif;
@@ -57,31 +57,18 @@
     .object-option:hover {
       border-color: #000;
     }
-
-    #save-area {
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 100px;
-      height: 50px;
-      z-index: 15;
-    }
-
     #save-button {
-        position: absolute;
-        top: 5px;
-        right: 5px;
-        z-index: 20;
-        background-color: #4CAF50;
-        color: white;
-        padding: 6px 10px;
-        font-size: 12px;
-        border: none;
-        cursor: pointer;
-        border-radius: 4px;
-        display: block; /* ←常時表示 */
-    }
-    #save-area:hover + #save-button {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      z-index: 20;
+      background-color: #4CAF50;
+      color: white;
+      padding: 6px 10px;
+      font-size: 12px;
+      border: none;
+      cursor: pointer;
+      border-radius: 4px;
       display: block;
     }
   </style>
@@ -100,7 +87,6 @@
       <p>オブジェクトを選択：</p>
       <div id="options_odin"></div>
     </div>
-    <div id="save-area"></div>
     <button id="save-button" onclick="saveMap()">保存</button>
   </div>
 
@@ -110,6 +96,7 @@
     const popup_odin = document.getElementById("popup_odin");
     const options = document.getElementById("options");
     const options_odin = document.getElementById("options_odin");
+    const bg = document.getElementById("map-image");
 
     const objectImages = ["Dwelling.png", "obj1.png", "obj2.png", "obj3.png", "obj4.png"];
     const odinImages = ["Odin.png", "Odin1.png", "Odin2.png"];
@@ -152,47 +139,15 @@
       options_odin.appendChild(img);
     });
 
-    hotspots.forEach(spot => {
+    hotspots.forEach((spot) => {
       const div = document.createElement("div");
       div.className = "hotspot";
-      Object.assign(div.style, {
-        left: spot.x + "px",
-        top: spot.y + "px",
-        width: spot.width + "px",
-        height: spot.height + "px"
-      });
-      div.addEventListener("click", (e) => {
-        e.stopPropagation();
-        Object.assign(popup.style, {
-          left: spot.x + "px",
-          top: spot.y + "px",
-          display: "block"
-        });
-        popup.dataset.x = spot.x;
-        popup.dataset.y = spot.y;
-      });
       mapContainer.appendChild(div);
     });
 
-    odin_hotspots.forEach(spot => {
+    odin_hotspots.forEach((spot) => {
       const div = document.createElement("div");
       div.className = "odin_hotspot";
-      Object.assign(div.style, {
-        left: spot.x + "px",
-        top: spot.y + "px",
-        width: spot.width + "px",
-        height: spot.height + "px"
-      });
-      div.addEventListener("click", (e) => {
-        e.stopPropagation();
-        Object.assign(popup_odin.style, {
-          left: spot.x + "px",
-          top: spot.y + "px",
-          display: "block"
-        });
-        popup_odin.dataset.x = spot.x;
-        popup_odin.dataset.y = spot.y;
-      });
       mapContainer.appendChild(div);
     });
 
@@ -200,21 +155,62 @@
       const img = document.createElement("img");
       img.src = src;
       img.className = "map-object";
-      Object.assign(img.style, {
-        left: x + "px",
-        top: y + "px",
-        width: width + "px",
-        transform: "translate(0, 0)"
-      });
+      img.dataset.x = x;
+      img.dataset.y = y;
+      img.dataset.w = width;
       mapContainer.appendChild(img);
+      updatePositions();
+    }
+
+    function updatePositions() {
+      const scaleX = bg.clientWidth / bg.naturalWidth;
+      const scaleY = bg.clientHeight / bg.naturalHeight;
+
+      document.querySelectorAll(".hotspot").forEach((el, i) => {
+        const spot = hotspots[i];
+        el.style.left = (spot.x * scaleX) + "px";
+        el.style.top = (spot.y * scaleY) + "px";
+        el.style.width = (spot.width * scaleX) + "px";
+        el.style.height = (spot.height * scaleY) + "px";
+        el.onclick = (e) => {
+          e.stopPropagation();
+          popup.dataset.x = spot.x;
+          popup.dataset.y = spot.y;
+          popup.style.left = (spot.x * scaleX) + "px";
+          popup.style.top = (spot.y * scaleY) + "px";
+          popup.style.display = "block";
+        };
+      });
+
+      document.querySelectorAll(".odin_hotspot").forEach((el, i) => {
+        const spot = odin_hotspots[i];
+        el.style.left = (spot.x * scaleX) + "px";
+        el.style.top = (spot.y * scaleY) + "px";
+        el.style.width = (spot.width * scaleX) + "px";
+        el.style.height = (spot.height * scaleY) + "px";
+        el.onclick = (e) => {
+          e.stopPropagation();
+          popup_odin.dataset.x = spot.x;
+          popup_odin.dataset.y = spot.y;
+          popup_odin.style.left = (spot.x * scaleX) + "px";
+          popup_odin.style.top = (spot.y * scaleY) + "px";
+          popup_odin.style.display = "block";
+        };
+      });
+
+      document.querySelectorAll(".map-object").forEach((el) => {
+        const x = parseFloat(el.dataset.x);
+        const y = parseFloat(el.dataset.y);
+        const w = parseFloat(el.dataset.w);
+        el.style.left = (x * scaleX) + "px";
+        el.style.top = (y * scaleY) + "px";
+        el.style.width = (w * scaleX) + "px";
+      });
     }
 
     function saveMap() {
-      const bg = document.getElementById("map-image");
-
       const tempImg = new Image();
       tempImg.src = bg.src;
-
       tempImg.onload = () => {
         const width = tempImg.naturalWidth;
         const height = tempImg.naturalHeight;
@@ -226,7 +222,6 @@
 
         ctx.drawImage(tempImg, 0, 0, width, height);
 
-        // 一時的にホットスポットを非表示
         const hideElements = document.querySelectorAll(".hotspot, .odin_hotspot");
         hideElements.forEach(el => el.style.visibility = "hidden");
 
@@ -235,12 +230,10 @@
 
         objects.forEach(obj => {
           const img = new Image();
-          img.crossOrigin = "anonymous";  // 外部画像対策（必要なら）
           img.src = obj.src;
-          const x = parseFloat(obj.style.left);
-          const y = parseFloat(obj.style.top);
-          const w = parseFloat(obj.style.width);
-
+          const x = parseFloat(obj.dataset.x);
+          const y = parseFloat(obj.dataset.y);
+          const w = parseFloat(obj.dataset.w);
           promises.push(new Promise(resolve => {
             img.onload = () => {
               const h = img.height * w / img.width;
@@ -254,16 +247,17 @@
           const link = document.createElement("a");
           link.download = "map_export.png";
           link.href = canvas.toDataURL("image/png");
-
-          document.body.appendChild(link);
           link.click();
-          document.body.removeChild(link);
-
-          // ホットスポットを復元
           hideElements.forEach(el => el.style.visibility = "visible");
         });
       };
     }
+
+    window.addEventListener("resize", updatePositions);
+    window.addEventListener("DOMContentLoaded", () => {
+      if (bg.complete) updatePositions();
+      else bg.addEventListener("load", updatePositions);
+    });
   </script>
 </body>
 </html>
