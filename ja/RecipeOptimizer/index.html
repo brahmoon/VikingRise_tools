@@ -7,15 +7,12 @@
 <style>
 body { font-family: sans-serif; padding: 20px; margin:0; box-sizing:border-box; }
 .wrapper { width: 100%; max-width: 100%; overflow-x: auto; }
-
 .stock-container { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
 .stock-container div { display: flex; align-items: center; gap: 5px; }
 input { width: 60px; }
-
 table { border: 1px solid #ccc; border-collapse: collapse; width: 100%; max-width: 100%; }
 th, td { border: 1px solid #ccc; padding: 5px; text-align: center; }
 th { background-color: #f0f0f0; }
-
 @media (max-width: 600px) {
   .stock-container { flex-direction: column; }
   input { width: 50px; }
@@ -104,7 +101,11 @@ async function calculate() {
 
   const recipeNames = Object.keys(recipes);
 
-  const lp = { name:'RecipeOptimization', objective:{ direction: glpk.GLP_MAX, name:'total', vars:[] }, subjectTo:[] };
+  const lp = { 
+    name:'RecipeOptimization', 
+    objective:{ direction: glpk.GLP_MAX, name:'total', vars:[] }, 
+    subjectTo:[]
+  };
 
   // 目的関数：全材料消費量の最大化
   recipeNames.forEach(r => {
@@ -112,19 +113,19 @@ async function calculate() {
     lp.objective.vars.push({ name:r, coef:coef });
   });
 
-  // 材料制約と整数変数指定
+  // 材料制約（LPなので type は不要）
   ['肉','魚','人参','塩','水'].forEach(mat => {
     const cons = { name: mat, vars: [], bnds:{ type: glpk.GLP_UP, ub: stock[mat], lb:0 } };
-    recipeNames.forEach(r => {
-      cons.vars.push({ name: r, coef: recipes[r][mat], type: glpk.GLP_IV }); // ←整数制約
-    });
+    recipeNames.forEach(r => cons.vars.push({ name: r, coef: recipes[r][mat] }));
     lp.subjectTo.push(cons);
   });
 
   try {
-    const result = await glpk.solve(lp, { msglev: glpk.GLP_MSG_OFF, mip: true });
+    const result = await glpk.solve(lp, { msglev: glpk.GLP_MSG_OFF });
+
+    // 小数点込みの最適化結果 → 整数部分だけ切り捨て
     const counts = {};
-    recipeNames.forEach(r => counts[r] = result.result.vars[r] || 0);
+    recipeNames.forEach(r => counts[r] = Math.floor(result.result.vars[r] || 0));
 
     showRecipeTable(counts);
 
