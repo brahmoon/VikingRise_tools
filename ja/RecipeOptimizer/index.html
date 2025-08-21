@@ -3,35 +3,30 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>レシピ最適化ツール</title>
+<title>レシピ最適化ツール（GLPK版）</title>
+<script src="https://unpkg.com/glpk.js/dist/glpk.min.js"></script>
 <style>
-body { font-family: sans-serif; padding: 20px; margin: 0; box-sizing: border-box; }
+body { font-family: sans-serif; padding: 20px; margin:0; box-sizing:border-box; }
 .wrapper { width: 100%; max-width: 100%; overflow-x: auto; }
 
-/* 所持素材入力 */
 .stock-container { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
 .stock-container div { display: flex; align-items: center; gap: 5px; }
-
 input { width: 60px; }
 
-/* テーブルスタイル */
 table { border: 1px solid #ccc; border-collapse: collapse; width: 100%; max-width: 100%; }
 th, td { border: 1px solid #ccc; padding: 5px; text-align: center; }
 th { background-color: #f0f0f0; }
 
-/* 小さい画面での調整 */
 @media (max-width: 600px) {
-  body { padding: 10px; }
+  .stock-container { flex-direction: column; }
   input { width: 50px; }
   table { font-size: 12px; }
-  /* 所持素材入力を縦1列に */
-  .stock-container { flex-direction: column; }
 }
 </style>
 </head>
 <body>
 <div class="wrapper">
-<h2>レシピ最適化ツール</h2>
+<h2>レシピ最適化ツール（GLPK版）</h2>
 
 <h3>所持食材数を入力</h3>
 <div class="stock-container">
@@ -80,7 +75,6 @@ const recipes = {
   ご馳走盛り合わせ: {肉:0, 魚:5, 人参:15, 塩:10, 水:0}
 };
 
-// 料理一覧テーブル作成（作成回数列含む）
 function showRecipeTable(counts={}) {
   const table = document.getElementById('recipe_table');
   table.innerHTML = "<tr><th>料理</th><th>肉</th><th>魚</th><th>人参</th><th>塩</th><th>水</th><th>作成回数</th></tr>";
@@ -97,7 +91,6 @@ function showRecipeTable(counts={}) {
   }
 }
 
-// 計算実行
 function calculate() {
   const stock = {
     肉: parseInt(document.getElementById('stock_meat').value) || 0,
@@ -108,45 +101,43 @@ function calculate() {
   };
 
   const recipeNames = Object.keys(recipes);
-  let best = {total:0, counts:{}};
+  
+  // GLPK用モデル作成
+  const lp = {
+    name: 'RecipeOptimization',
+    objective: { direction: glpk.GLP_MAX, name: 'total', vars: [] },
+    subjectTo: []
+  };
 
-  function dfs(index, currentStock, counts, total) {
-    if (index >= recipeNames.length) {
-      if (total > best.total) {
-        best.total = total;
-        best.counts = {...counts};
-      }
-      return;
-    }
+  // 変数（各料理の作成回数）
+  recipeNames.forEach(r => {
+    lp.objective.vars.push({ name: r, coef: 1 });
+  });
 
-    const name = recipeNames[index];
-    const recipe = recipes[name];
-    let maxTimes = Infinity;
-    for (let mat in recipe) {
-      if (recipe[mat] > 0) {
-        maxTimes = Math.min(maxTimes, Math.floor(currentStock[mat] / recipe[mat]));
-      }
-    }
-    maxTimes = Math.max(maxTimes,0);
+  // 制約（素材ごと）
+  ['肉','魚','人参','塩','水'].forEach(mat => {
+    let cons = { name: mat, vars: [], bnds: { type: glpk.GLP_UP, ub: stock[mat], lb:0 } };
+    recipeNames.forEach(r => {
+      cons.vars.push({ name: r, coef: recipes[r][mat] });
+    });
+    lp.subjectTo.push(cons);
+  });
 
-    for (let t=0; t<=maxTimes; t++) {
-      let nextStock = {...currentStock};
-      for (let mat in recipe) {
-        nextStock[mat] -= recipe[mat]*t;
-      }
-      counts[name] = t;
-      dfs(index+1, nextStock, counts, total + t);
-    }
-    counts[name] = 0;
-  }
+  // GLPKで解く
+  const result = glpk.solve(lp, { msgLevel: glpk.GLP_MSG_OFF });
 
-  dfs(0, stock, {}, 0);
+  // 作成回数を整数に丸める
+  let counts = {};
+  recipeNames.forEach(r => {
+    counts[r] = Math.floor(result.result.vars[r]) || 0;
+  });
 
-  showRecipeTable(best.counts);
+  showRecipeTable(counts);
 
+  // 余った素材
   let leftover = {...stock};
-  for (let r in best.counts) {
-    const count = best.counts[r];
+  for (let r in counts) {
+    const count = counts[r];
     for (let mat in recipes[r]) {
       leftover[mat] -= recipes[r][mat]*count;
     }
