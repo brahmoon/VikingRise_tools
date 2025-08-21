@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>料理最適化アプリ</title>
+<style>
+body { font-family: sans-serif; padding: 20px; }
+input { width: 60px; margin: 0 5px; }
+table, th, td { border: 1px solid #ccc; border-collapse: collapse; padding: 5px; }
+th { background-color: #f0f0f0; }
+</style>
+</head>
+<body>
+<h2>料理最適化アプリ</h2>
+
+<h3>所持食材数を入力</h3>
+<div>
+  肉: <input type="number" id="stock_meat" value="0" min="0">
+  魚: <input type="number" id="stock_fish" value="0" min="0">
+  人参: <input type="number" id="stock_carrot" value="0" min="0">
+  塩: <input type="number" id="stock_salt" value="0" min="0">
+  水: <input type="number" id="stock_water" value="0" min="0">
+</div>
+<button onclick="calculate()">計算</button>
+
+<h3>料理一覧（消費素材数 + 調理回数）</h3>
+<table id="recipe_table">
+<tr>
+  <th>料理</th>
+  <th>肉</th>
+  <th>魚</th>
+  <th>人参</th>
+  <th>塩</th>
+  <th>水</th>
+  <th>作成回数</th>
+</tr>
+</table>
+
+<h3>余った食材</h3>
+<ul id="leftover_list"></ul>
+
+<script>
+// レシピデータ
+const recipes = {
+  炭火焼き魚: {肉:0, 魚:30, 人参:5, 塩:15, 水:0},
+  炭火焼きリブ: {肉:30, 魚:0, 人参:5, 塩:15, 水:0},
+  炭火焼き野菜: {肉:0, 魚:0, 人参:30, 塩:15, 水:5},
+  風味豊かな魚: {肉:0, 魚:25, 人参:0, 塩:15, 水:5},
+  風味豊かな肉: {肉:25, 魚:0, 人参:0, 塩:15, 水:5},
+  風味豊かな野菜: {肉:0, 魚:0, 人参:25, 塩:15, 水:5},
+  タラのスープ: {肉:0, 魚:15, 人参:0, 塩:5, 水:20},
+  煮込みリブ: {肉:15, 魚:0, 人参:5, 塩:0, 水:20},
+  濃厚な野菜スープ: {肉:0, 魚:0, 人参:15, 塩:5, 水:20},
+  塩漬けニシン: {肉:0, 魚:15, 人参:5, 塩:5, 水:0},
+  塩漬け干し肉: {肉:15, 魚:0, 人参:5, 塩:5, 水:0},
+  蒸しシーフード盛り合わせ: {肉:0, 魚:15, 人参:5, 塩:0, 水:10},
+  焼肉盛り合わせ: {肉:15, 魚:0, 人参:5, 塩:10, 水:0},
+  美味しい野菜盛り合わせ: {肉:0, 魚:0, 人参:15, 塩:5, 水:10},
+  ご馳走盛り合わせ: {肉:0, 魚:5, 人参:15, 塩:10, 水:0}
+};
+
+// 料理一覧テーブル作成（実行前は作成回数0）
+function showRecipeTable(counts={}) {
+  const table = document.getElementById('recipe_table');
+  table.innerHTML = "<tr><th>料理</th><th>肉</th><th>魚</th><th>人参</th><th>塩</th><th>水</th><th>作成回数</th></tr>";
+  for (let r in recipes) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${r}</td>
+                    <td>${recipes[r].肉}</td>
+                    <td>${recipes[r].魚}</td>
+                    <td>${recipes[r].人参}</td>
+                    <td>${recipes[r].塩}</td>
+                    <td>${recipes[r].水}</td>
+                    <td>${counts[r] || 0}</td>`;
+    table.appendChild(tr);
+  }
+}
+
+// 計算実行
+function calculate() {
+  const stock = {
+    肉: parseInt(document.getElementById('stock_meat').value) || 0,
+    魚: parseInt(document.getElementById('stock_fish').value) || 0,
+    人参: parseInt(document.getElementById('stock_carrot').value) || 0,
+    塩: parseInt(document.getElementById('stock_salt').value) || 0,
+    水: parseInt(document.getElementById('stock_water').value) || 0
+  };
+
+  const recipeNames = Object.keys(recipes);
+  let best = {total:0, counts:{}};
+
+  function dfs(index, currentStock, counts, total) {
+    if (index >= recipeNames.length) {
+      if (total > best.total) {
+        best.total = total;
+        best.counts = {...counts};
+      }
+      return;
+    }
+
+    const name = recipeNames[index];
+    const recipe = recipes[name];
+    let maxTimes = Infinity;
+    for (let mat in recipe) {
+      if (recipe[mat] > 0) {
+        maxTimes = Math.min(maxTimes, Math.floor(currentStock[mat] / recipe[mat]));
+      }
+    }
+    maxTimes = Math.max(maxTimes,0);
+
+    for (let t=0; t<=maxTimes; t++) {
+      let nextStock = {...currentStock};
+      for (let mat in recipe) {
+        nextStock[mat] -= recipe[mat]*t;
+      }
+      counts[name] = t;
+      dfs(index+1, nextStock, counts, total + t);
+    }
+    counts[name] = 0;
+  }
+
+  dfs(0, stock, {}, 0);
+
+  // 作成回数を料理一覧に反映
+  showRecipeTable(best.counts);
+
+  // 余った食材計算
+  let leftover = {...stock};
+  for (let r in best.counts) {
+    const count = best.counts[r];
+    for (let mat in recipes[r]) {
+      leftover[mat] -= recipes[r][mat]*count;
+    }
+  }
+
+  const ul = document.getElementById('leftover_list');
+  ul.innerHTML = '';
+  for (let mat in leftover) {
+    let li = document.createElement('li');
+    li.textContent = `${mat}: ${leftover[mat]}`;
+    ul.appendChild(li);
+  }
+}
+
+// 初期表示
+showRecipeTable();
+</script>
+</body>
+</html>
