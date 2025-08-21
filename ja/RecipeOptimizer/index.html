@@ -26,11 +26,11 @@ th { background-color: #f0f0f0; }
 
 <h3>所持食材数を入力</h3>
 <div class="stock-container">
-  <div>肉: <input type="number" id="stock_meat" value="" min="0"></div>
-  <div>魚: <input type="number" id="stock_fish" value="" min="0"></div>
-  <div>人参: <input type="number" id="stock_carrot" value="" min="0"></div>
-  <div>塩: <input type="number" id="stock_salt" value="" min="0"></div>
-  <div>水: <input type="number" id="stock_water" value="" min="0"></div>
+  <div>肉: <input type="number" id="stock_meat" value="0" min="0"></div>
+  <div>魚: <input type="number" id="stock_fish" value="0" min="0"></div>
+  <div>人参: <input type="number" id="stock_carrot" value="0" min="0"></div>
+  <div>塩: <input type="number" id="stock_salt" value="0" min="0"></div>
+  <div>水: <input type="number" id="stock_water" value="0" min="0"></div>
 </div>
 <button id="calculateBtn">計算</button>
 
@@ -75,17 +75,34 @@ const recipes = {
 function showRecipeTable(counts={}) {
   const table = document.getElementById('recipe_table');
   table.innerHTML = "<tr><th>料理</th><th>肉</th><th>魚</th><th>人参</th><th>塩</th><th>水</th><th>作成回数</th></tr>";
+
+  let totalCount = 0;
+
   for (let r in recipes) {
     const tr = document.createElement('tr');
+    const count = counts[r] || 0;
+    totalCount += count;
     tr.innerHTML = `<td>${r}</td>
                     <td>${recipes[r].肉}</td>
                     <td>${recipes[r].魚}</td>
                     <td>${recipes[r].人参}</td>
                     <td>${recipes[r].塩}</td>
                     <td>${recipes[r].水}</td>
-                    <td>${counts[r] || 0}</td>`;
+                    <td>${count}</td>`;
     table.appendChild(tr);
   }
+
+  // 合計表示
+  const totalDivId = "total_count_div";
+  let totalDiv = document.getElementById(totalDivId);
+  if (!totalDiv) {
+    totalDiv = document.createElement('div');
+    totalDiv.id = totalDivId;
+    totalDiv.style.marginTop = "10px";
+    totalDiv.style.fontWeight = "bold";
+    table.parentNode.appendChild(totalDiv);
+  }
+  totalDiv.textContent = `合計作成回数: ${totalCount}`;
 }
 
 async function calculate() {
@@ -101,9 +118,7 @@ async function calculate() {
 
   const recipeNames = Object.keys(recipes);
 
-  // --------------------
-  // 1. LP最適化
-  // --------------------
+  // 1. LP最適化（素材消費少ないレシピ優先）
   const lp = { 
     name:'RecipeOptimization', 
     objective:{ direction: glpk.GLP_MAX, name:'total', vars:[] }, 
@@ -111,8 +126,8 @@ async function calculate() {
   };
 
   recipeNames.forEach(r => {
-    const coef = recipes[r].肉 + recipes[r].魚 + recipes[r].人参 + recipes[r].塩 + recipes[r].水;
-    lp.objective.vars.push({ name:r, coef:coef });
+    const total = Object.values(recipes[r]).reduce((a,b)=>a+b,0);
+    lp.objective.vars.push({ name:r, coef:1/total });
   });
 
   ['肉','魚','人参','塩','水'].forEach(mat => {
@@ -122,23 +137,14 @@ async function calculate() {
   });
 
   let result;
-  try {
-    result = await glpk.solve(lp, { msglev: glpk.GLP_MSG_OFF });
-  } catch(err) {
-    console.error("最適化エラー:", err);
-    alert("計算中にエラーが発生しました。");
-    return;
-  }
+  try { result = await glpk.solve(lp, { msglev: glpk.GLP_MSG_OFF }); } 
+  catch(err) { console.error(err); alert("計算中にエラーが発生しました。"); return; }
 
-  // --------------------
   // 2. 整数部分だけ切り捨て
-  // --------------------
   const counts = {};
   recipeNames.forEach(r => counts[r] = Math.floor(result.result.vars[r] || 0));
 
-  // --------------------
   // 3. 余り計算
-  // --------------------
   let leftover = {...stock};
   for (let r in counts) {
     const count = counts[r];
@@ -147,40 +153,35 @@ async function calculate() {
     }
   }
 
-  // --------------------
-  // 4. 残余素材で再調理
-  // --------------------
+  // 4. 残余素材で再調理（素材消費少ない順優先）
   while(true) {
-    // 作れる回数の最大値と対象レシピを探す
     let bestRecipe = null;
     let bestCount = 0;
+    let bestScore = Infinity;
 
     recipeNames.forEach(r => {
       let maxCount = Infinity;
-      for (let mat in recipes[r]) {
-        if (recipes[r][mat] > 0) {
-          maxCount = Math.min(maxCount, Math.floor(leftover[mat]/recipes[r][mat]));
-        }
+      let score = Object.values(recipes[r]).reduce((a,b)=>a+b,0);
+      for(let mat in recipes[r]) {
+        if(recipes[r][mat]>0) maxCount = Math.min(maxCount, Math.floor(leftover[mat]/recipes[r][mat]));
       }
-      if (maxCount > 0 && maxCount > bestCount) {
+      if(maxCount <=0) return;
+      if(score < bestScore || (score === bestScore && maxCount > bestCount)){
+        bestScore = score;
         bestCount = maxCount;
         bestRecipe = r;
       }
     });
 
-    if(!bestRecipe) break; // 作れるレシピなしで終了
+    if(!bestRecipe) break;
 
     counts[bestRecipe] += bestCount;
-
-    // 残余素材を更新
-    for (let mat in recipes[bestRecipe]) {
+    for(let mat in recipes[bestRecipe]){
       leftover[mat] -= recipes[bestRecipe][mat]*bestCount;
     }
   }
 
-  // --------------------
   // 5. 結果表示
-  // --------------------
   showRecipeTable(counts);
 
   const ul = document.getElementById('leftover_list');
