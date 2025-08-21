@@ -56,16 +56,9 @@ th { background-color: #f0f0f0; }
 
 <!-- 最新 glpk.js と WASM を読み込む -->
 <script type="module">
-import GLPK from './lib/glpk.js';  // 最新 glpk.js をローカルに置く
+import { GLPK } from './lib/glpk.js';  // default ではなく {}
 
-let glpkInstance = null;
-
-// 非同期で glpk を初期化
-async function initGLPK() {
-  glpkInstance = await GLPK();
-}
-
-initGLPK();
+const glpkInstance = await GLPK();
 
 // レシピデータ
 const recipes = {
