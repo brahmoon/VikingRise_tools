@@ -1,17 +1,28 @@
-<!DOCTYPE html>
-<html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>レシピ最適化ツール</title>
 <style>
-body { font-family: sans-serif; padding: 20px; }
+body { font-family: sans-serif; padding: 20px; margin:0; box-sizing:border-box; }
+.wrapper { width: 100%; max-width: 100%; overflow-x: auto; }
+
 input { width: 60px; margin: 0 5px; }
-table, th, td { border: 1px solid #ccc; border-collapse: collapse; padding: 5px; }
+
+table { border: 1px solid #ccc; border-collapse: collapse; width: 100%; max-width: 100%; }
+th, td { border: 1px solid #ccc; padding: 5px; text-align: center; }
 th { background-color: #f0f0f0; }
+
+/* 小さい画面用に文字サイズ調整 */
+@media (max-width: 600px) {
+  body { padding: 10px; }
+  input { width: 50px; margin: 0 3px; }
+  table { font-size: 12px; }
+}
 </style>
 </head>
 <body>
-<h2>レシピ最適化ツール</h2>
+<div class="wrapper">
+<h2>料理最適化アプリ</h2>
 
 <h3>所持食材数を入力</h3>
 <div>
@@ -145,5 +156,6 @@ function calculate() {
 // 初期表示
 showRecipeTable();
 </script>
+</div>
 </body>
 </html>
