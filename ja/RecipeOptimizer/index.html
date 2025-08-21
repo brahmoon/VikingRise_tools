@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>レシピ最適化ツール（GLPK-WASM版）</title>
+<title>レシピ最適化ツール（GLPK-UMD版）</title>
 <style>
 body { font-family: sans-serif; padding: 20px; margin:0; box-sizing:border-box; }
 .wrapper { width: 100%; max-width: 100%; overflow-x: auto; }
@@ -25,7 +25,7 @@ th { background-color: #f0f0f0; }
 </head>
 <body>
 <div class="wrapper">
-<h2>レシピ最適化ツール（GLPK-WASM版）</h2>
+<h2>レシピ最適化ツール（GLPK-UMD版）</h2>
 
 <h3>所持食材数を入力</h3>
 <div class="stock-container">
@@ -54,12 +54,9 @@ th { background-color: #f0f0f0; }
 <ul id="leftover_list"></ul>
 </div>
 
-<!-- 最新 glpk.js と WASM を読み込む -->
-<script type="module">
-import { GLPK } from './lib/glpk.js';  // default ではなく {}
-
-const glpkInstance = await GLPK();
-
+<!-- UMD版 glpk.js を読み込む -->
+<script src="./lib/glpk.js"></script>
+<script>
 // レシピデータ
 const recipes = {
   炭火焼き魚: {肉:0, 魚:30, 人参:5, 塩:15, 水:0},
@@ -97,12 +94,7 @@ function showRecipeTable(counts={}) {
 }
 
 // 計算実行
-async function calculate() {
-  if (!glpkInstance) {
-    alert('GLPK がまだ初期化されていません。少し待ってから再実行してください。');
-    return;
-  }
-
+function calculate() {
   const stock = {
     肉: parseInt(document.getElementById('stock_meat').value) || 0,
     魚: parseInt(document.getElementById('stock_fish').value) || 0,
@@ -113,10 +105,9 @@ async function calculate() {
 
   const recipeNames = Object.keys(recipes);
 
-  // LPモデル作成
   const lp = {
     name: 'RecipeOptimization',
-    objective: { direction: glpkInstance.GLP_MAX, name: 'total', vars: [] },
+    objective: { direction: glpk.GLP_MAX, name: 'total', vars: [] },
     subjectTo: []
   };
 
@@ -125,17 +116,15 @@ async function calculate() {
   });
 
   ['肉','魚','人参','塩','水'].forEach(mat => {
-    let cons = { name: mat, vars: [], bnds: { type: glpkInstance.GLP_UP, ub: stock[mat], lb:0 } };
+    let cons = { name: mat, vars: [], bnds: { type: glpk.GLP_UP, ub: stock[mat], lb:0 } };
     recipeNames.forEach(r => {
       cons.vars.push({ name: r, coef: recipes[r][mat] });
     });
     lp.subjectTo.push(cons);
   });
 
-  // GLPK で解く
-  const result = glpkInstance.solve(lp, { msgLevel: glpkInstance.GLP_MSG_OFF });
+  const result = glpk.solve(lp, { msgLevel: glpk.GLP_MSG_OFF });
 
-  // 作成回数を整数化
   let counts = {};
   recipeNames.forEach(r => {
     counts[r] = Math.floor(result.result.vars[r]) || 0;
@@ -143,7 +132,6 @@ async function calculate() {
 
   showRecipeTable(counts);
 
-  // 余った素材計算
   let leftover = {...stock};
   for (let r in counts) {
     const count = counts[r];
@@ -161,10 +149,7 @@ async function calculate() {
   }
 }
 
-// ボタンにイベント追加
 document.getElementById('calculateBtn').addEventListener('click', calculate);
-
-// 初期表示
 showRecipeTable();
 </script>
 </body>
