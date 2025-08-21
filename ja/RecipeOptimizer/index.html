@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>レシピ最適化ツール（GLPK-ESM版）</title>
+<title>レシピ最適化ツール</title>
 <style>
 body { font-family: sans-serif; padding: 20px; margin:0; box-sizing:border-box; }
 .wrapper { width: 100%; max-width: 100%; overflow-x: auto; }
@@ -25,7 +25,7 @@ th { background-color: #f0f0f0; }
 </head>
 <body>
 <div class="wrapper">
-<h2>レシピ最適化ツール（GLPK-ESM版）</h2>
+<h2>レシピ最適化ツール</h2>
 
 <h3>所持食材数を入力</h3>
 <div class="stock-container">
@@ -55,9 +55,8 @@ th { background-color: #f0f0f0; }
 </div>
 
 <script type="module">
-import GLPK from "./lib/index.js"; // GitHub Pagesのパスに合わせる
+import GLPK from "./lib/index.js"; // GitHub Pagesに合わせる
 
-// レシピデータ
 const recipes = {
   炭火焼き魚: {肉:0, 魚:30, 人参:5, 塩:15, 水:0},
   炭火焼きリブ: {肉:30, 魚:0, 人参:5, 塩:15, 水:0},
@@ -76,7 +75,7 @@ const recipes = {
   ご馳走盛り合わせ: {肉:0, 魚:5, 人参:15, 塩:10, 水:0}
 };
 
-// 料理一覧表示
+// 表示関数
 function showRecipeTable(counts={}) {
   const table = document.getElementById('recipe_table');
   table.innerHTML = "<tr><th>料理</th><th>肉</th><th>魚</th><th>人参</th><th>塩</th><th>水</th><th>作成回数</th></tr>";
@@ -93,9 +92,9 @@ function showRecipeTable(counts={}) {
   }
 }
 
-// 計算実行（非同期）
+// 計算実行（整数最適化）
 async function calculate() {
-  const glpk = await GLPK(); // インスタンス化
+  const glpk = await GLPK();
 
   const stock = {
     肉: parseInt(document.getElementById('stock_meat').value) || 0,
@@ -107,34 +106,29 @@ async function calculate() {
 
   const recipeNames = Object.keys(recipes);
 
-  const lp = {
-    name: 'RecipeOptimization',
-    objective: { direction: glpk.GLP_MAX, name: 'total', vars: [] },
-    subjectTo: []
-  };
+  const lp = { name:'RecipeOptimization', objective:{direction:glpk.GLP_MAX, name:'total', vars:[]}, subjectTo:[] };
 
+  // 目的関数：全材料消費量を最大化
   recipeNames.forEach(r => {
-    lp.objective.vars.push({ name: r, coef: 1 });
+    const coef = recipes[r].肉 + recipes[r].魚 + recipes[r].人参 + recipes[r].塩 + recipes[r].水;
+    lp.objective.vars.push({ name:r, coef:coef, kind:glpk.GLP_IV }); // 整数制約
   });
 
+  // 材料在庫制約
   ['肉','魚','人参','塩','水'].forEach(mat => {
-    const cons = { name: mat, vars: [], bnds: { type: glpk.GLP_UP, ub: stock[mat], lb:0 } };
-    recipeNames.forEach(r => {
-      cons.vars.push({ name: r, coef: recipes[r][mat] });
-    });
+    const cons = { name: mat, vars: [], bnds:{type: glpk.GLP_UP, ub: stock[mat], lb:0} };
+    recipeNames.forEach(r => cons.vars.push({name:r, coef:recipes[r][mat]}));
     lp.subjectTo.push(cons);
   });
 
   try {
     const result = await glpk.solve(lp, { msglev: glpk.GLP_MSG_OFF });
-
     const counts = {};
-    recipeNames.forEach(r => {
-      counts[r] = Math.floor(result.result.vars[r]) || 0;
-    });
+    recipeNames.forEach(r => counts[r] = result.result.vars[r] || 0);
 
     showRecipeTable(counts);
 
+    // 余り計算
     const leftover = {...stock};
     for (let r in counts) {
       const count = counts[r];
