@@ -106,20 +106,26 @@ async function calculate() {
 
   const recipeNames = Object.keys(recipes);
 
-  const lp = { name:'RecipeOptimization', objective:{direction:glpk.GLP_MAX, name:'total', vars:[]}, subjectTo:[] };
-
-  // 目的関数：全材料消費量を最大化
+  const lp = {
+    name:'RecipeOptimization',
+    objective:{ direction: glpk.GLP_MAX, name:'total', vars:[] },
+    subjectTo:[]
+  };
+  
   recipeNames.forEach(r => {
     const coef = recipes[r].肉 + recipes[r].魚 + recipes[r].人参 + recipes[r].塩 + recipes[r].水;
-    lp.objective.vars.push({ name:r, coef:coef, kind:glpk.GLP_IV }); // 整数制約
+    lp.objective.vars.push({ name:r, coef:coef, kind:glpk.GLP_IV }); // 整数変数指定
   });
-
-  // 材料在庫制約
+  
+  // 材料制約
   ['肉','魚','人参','塩','水'].forEach(mat => {
     const cons = { name: mat, vars: [], bnds:{type: glpk.GLP_UP, ub: stock[mat], lb:0} };
-    recipeNames.forEach(r => cons.vars.push({name:r, coef:recipes[r][mat]}));
+    recipeNames.forEach(r => cons.vars.push({ name:r, coef:recipes[r][mat] }));
     lp.subjectTo.push(cons);
   });
+  
+  // 整数最適化で計算
+  const result = await glpk.solve(lp, { msglev: glpk.GLP_MSG_OFF, mip:true });
 
   try {
     const result = await glpk.solve(lp, { msglev: glpk.GLP_MSG_OFF });
