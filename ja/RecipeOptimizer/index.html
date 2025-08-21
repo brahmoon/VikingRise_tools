@@ -52,7 +52,7 @@ th { background-color: #f0f0f0; }
 </div>
 
 <script type="module">
-import GLPK from "./lib/index.js"; // GitHub Pages に配置した ESM版 glpk.js
+import GLPK from "./lib/index.js";
 
 const recipes = {
   炭火焼き魚: {肉:0, 魚:30, 人参:5, 塩:15, 水:0},
@@ -101,54 +101,94 @@ async function calculate() {
 
   const recipeNames = Object.keys(recipes);
 
+  // --------------------
+  // 1. LP最適化
+  // --------------------
   const lp = { 
     name:'RecipeOptimization', 
     objective:{ direction: glpk.GLP_MAX, name:'total', vars:[] }, 
     subjectTo:[]
   };
 
-  // 目的関数：全材料消費量の最大化
   recipeNames.forEach(r => {
     const coef = recipes[r].肉 + recipes[r].魚 + recipes[r].人参 + recipes[r].塩 + recipes[r].水;
     lp.objective.vars.push({ name:r, coef:coef });
   });
 
-  // 材料制約（LPなので type は不要）
   ['肉','魚','人参','塩','水'].forEach(mat => {
     const cons = { name: mat, vars: [], bnds:{ type: glpk.GLP_UP, ub: stock[mat], lb:0 } };
-    recipeNames.forEach(r => cons.vars.push({ name: r, coef: recipes[r][mat] }));
+    recipeNames.forEach(r => cons.vars.push({ name:r, coef: recipes[r][mat] }));
     lp.subjectTo.push(cons);
   });
 
+  let result;
   try {
-    const result = await glpk.solve(lp, { msglev: glpk.GLP_MSG_OFF });
-
-    // 小数点込みの最適化結果 → 整数部分だけ切り捨て
-    const counts = {};
-    recipeNames.forEach(r => counts[r] = Math.floor(result.result.vars[r] || 0));
-
-    showRecipeTable(counts);
-
-    // 余り計算
-    const leftover = {...stock};
-    for (let r in counts) {
-      const count = counts[r];
-      for (let mat in recipes[r]) {
-        leftover[mat] -= recipes[r][mat]*count;
-      }
-    }
-
-    const ul = document.getElementById('leftover_list');
-    ul.innerHTML = '';
-    for (let mat in leftover) {
-      const li = document.createElement('li');
-      li.textContent = `${mat}: ${leftover[mat]}`;
-      ul.appendChild(li);
-    }
-
+    result = await glpk.solve(lp, { msglev: glpk.GLP_MSG_OFF });
   } catch(err) {
     console.error("最適化エラー:", err);
-    alert("計算中にエラーが発生しました。コンソールを確認してください。");
+    alert("計算中にエラーが発生しました。");
+    return;
+  }
+
+  // --------------------
+  // 2. 整数部分だけ切り捨て
+  // --------------------
+  const counts = {};
+  recipeNames.forEach(r => counts[r] = Math.floor(result.result.vars[r] || 0));
+
+  // --------------------
+  // 3. 余り計算
+  // --------------------
+  let leftover = {...stock};
+  for (let r in counts) {
+    const count = counts[r];
+    for (let mat in recipes[r]) {
+      leftover[mat] -= recipes[r][mat]*count;
+    }
+  }
+
+  // --------------------
+  // 4. 残余素材で再調理
+  // --------------------
+  while(true) {
+    // 作れる回数の最大値と対象レシピを探す
+    let bestRecipe = null;
+    let bestCount = 0;
+
+    recipeNames.forEach(r => {
+      let maxCount = Infinity;
+      for (let mat in recipes[r]) {
+        if (recipes[r][mat] > 0) {
+          maxCount = Math.min(maxCount, Math.floor(leftover[mat]/recipes[r][mat]));
+        }
+      }
+      if (maxCount > 0 && maxCount > bestCount) {
+        bestCount = maxCount;
+        bestRecipe = r;
+      }
+    });
+
+    if(!bestRecipe) break; // 作れるレシピなしで終了
+
+    counts[bestRecipe] += bestCount;
+
+    // 残余素材を更新
+    for (let mat in recipes[bestRecipe]) {
+      leftover[mat] -= recipes[bestRecipe][mat]*bestCount;
+    }
+  }
+
+  // --------------------
+  // 5. 結果表示
+  // --------------------
+  showRecipeTable(counts);
+
+  const ul = document.getElementById('leftover_list');
+  ul.innerHTML = '';
+  for (let mat in leftover) {
+    const li = document.createElement('li');
+    li.textContent = `${mat}: ${leftover[mat]}`;
+    ul.appendChild(li);
   }
 }
 
