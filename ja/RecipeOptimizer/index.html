@@ -1,36 +1,45 @@
+<!DOCTYPE html>
+<html lang="ja">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>レシピ最適化ツール</title>
 <style>
-body { font-family: sans-serif; padding: 20px; margin:0; box-sizing:border-box; }
+body { font-family: sans-serif; padding: 20px; margin: 0; box-sizing: border-box; }
 .wrapper { width: 100%; max-width: 100%; overflow-x: auto; }
 
-input { width: 60px; margin: 0 5px; }
+/* 所持素材入力 */
+.stock-container { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.stock-container div { display: flex; align-items: center; gap: 5px; }
 
+input { width: 60px; }
+
+/* テーブルスタイル */
 table { border: 1px solid #ccc; border-collapse: collapse; width: 100%; max-width: 100%; }
 th, td { border: 1px solid #ccc; padding: 5px; text-align: center; }
 th { background-color: #f0f0f0; }
 
-/* 小さい画面用に文字サイズ調整 */
+/* 小さい画面での調整 */
 @media (max-width: 600px) {
   body { padding: 10px; }
-  input { width: 50px; margin: 0 3px; }
+  input { width: 50px; }
   table { font-size: 12px; }
+  /* 所持素材入力を縦1列に */
+  .stock-container { flex-direction: column; }
 }
 </style>
 </head>
 <body>
 <div class="wrapper">
-<h2>料理最適化アプリ</h2>
+<h2>レシピ最適化ツール</h2>
 
 <h3>所持食材数を入力</h3>
-<div>
-  肉: <input type="number" id="stock_meat" value="0" min="0">
-  魚: <input type="number" id="stock_fish" value="0" min="0">
-  人参: <input type="number" id="stock_carrot" value="0" min="0">
-  塩: <input type="number" id="stock_salt" value="0" min="0">
-  水: <input type="number" id="stock_water" value="0" min="0">
+<div class="stock-container">
+  <div>肉: <input type="number" id="stock_meat" value="0" min="0"></div>
+  <div>魚: <input type="number" id="stock_fish" value="0" min="0"></div>
+  <div>人参: <input type="number" id="stock_carrot" value="0" min="0"></div>
+  <div>塩: <input type="number" id="stock_salt" value="0" min="0"></div>
+  <div>水: <input type="number" id="stock_water" value="0" min="0"></div>
 </div>
 <button onclick="calculate()">計算</button>
 
@@ -49,6 +58,7 @@ th { background-color: #f0f0f0; }
 
 <h3>余った食材</h3>
 <ul id="leftover_list"></ul>
+</div>
 
 <script>
 // レシピデータ
@@ -70,7 +80,7 @@ const recipes = {
   ご馳走盛り合わせ: {肉:0, 魚:5, 人参:15, 塩:10, 水:0}
 };
 
-// 料理一覧テーブル作成（実行前は作成回数0）
+// 料理一覧テーブル作成（作成回数列含む）
 function showRecipeTable(counts={}) {
   const table = document.getElementById('recipe_table');
   table.innerHTML = "<tr><th>料理</th><th>肉</th><th>魚</th><th>人参</th><th>塩</th><th>水</th><th>作成回数</th></tr>";
@@ -132,10 +142,8 @@ function calculate() {
 
   dfs(0, stock, {}, 0);
 
-  // 作成回数を料理一覧に反映
   showRecipeTable(best.counts);
 
-  // 余った食材計算
   let leftover = {...stock};
   for (let r in best.counts) {
     const count = best.counts[r];
@@ -153,9 +161,7 @@ function calculate() {
   }
 }
 
-// 初期表示
 showRecipeTable();
 </script>
-</div>
 </body>
 </html>
