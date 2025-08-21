@@ -55,7 +55,7 @@ th { background-color: #f0f0f0; }
 </div>
 
 <script type="module">
-import GLPK from "./lib/index.js"; // GitHub Pagesに合わせる
+import GLPK from "./lib/index.js"; // GitHub Pages に配置した ESM版 glpk.js
 
 const recipes = {
   炭火焼き魚: {肉:0, 魚:30, 人参:5, 塩:15, 水:0},
@@ -75,7 +75,6 @@ const recipes = {
   ご馳走盛り合わせ: {肉:0, 魚:5, 人参:15, 塩:10, 水:0}
 };
 
-// 表示関数
 function showRecipeTable(counts={}) {
   const table = document.getElementById('recipe_table');
   table.innerHTML = "<tr><th>料理</th><th>肉</th><th>魚</th><th>人参</th><th>塩</th><th>水</th><th>作成回数</th></tr>";
@@ -92,7 +91,6 @@ function showRecipeTable(counts={}) {
   }
 }
 
-// 計算実行（整数最適化）
 async function calculate() {
   const glpk = await GLPK();
 
@@ -106,29 +104,23 @@ async function calculate() {
 
   const recipeNames = Object.keys(recipes);
 
-  const lp = {
-    name:'RecipeOptimization',
-    objective:{ direction: glpk.GLP_MAX, name:'total', vars:[] },
-    subjectTo:[]
-  };
-  
+  const lp = { name:'RecipeOptimization', objective:{ direction: glpk.GLP_MAX, name:'total', vars:[] }, subjectTo:[] };
+
+  // 目的関数：全材料消費量の最大化 & 整数変数
   recipeNames.forEach(r => {
     const coef = recipes[r].肉 + recipes[r].魚 + recipes[r].人参 + recipes[r].塩 + recipes[r].水;
-    lp.objective.vars.push({ name:r, coef:coef, kind:glpk.GLP_IV }); // 整数変数指定
+    lp.objective.vars.push({ name:r, coef:coef, kind:glpk.GLP_IV });
   });
-  
+
   // 材料制約
   ['肉','魚','人参','塩','水'].forEach(mat => {
-    const cons = { name: mat, vars: [], bnds:{type: glpk.GLP_UP, ub: stock[mat], lb:0} };
+    const cons = { name: mat, vars: [], bnds:{ type: glpk.GLP_UP, ub: stock[mat], lb:0 } };
     recipeNames.forEach(r => cons.vars.push({ name:r, coef:recipes[r][mat] }));
     lp.subjectTo.push(cons);
   });
-  
-  // 整数最適化で計算
-  const result = await glpk.solve(lp, { msglev: glpk.GLP_MSG_OFF, mip:true });
 
   try {
-    const result = await glpk.solve(lp, { msglev: glpk.GLP_MSG_OFF });
+    const result = await glpk.solve(lp, { msglev: glpk.GLP_MSG_OFF, mip:true });
     const counts = {};
     recipeNames.forEach(r => counts[r] = result.result.vars[r] || 0);
 
@@ -151,7 +143,7 @@ async function calculate() {
       ul.appendChild(li);
     }
 
-  } catch (err) {
+  } catch(err) {
     console.error("最適化エラー:", err);
     alert("計算中にエラーが発生しました。コンソールを確認してください。");
   }
