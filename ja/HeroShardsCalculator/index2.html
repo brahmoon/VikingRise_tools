@@ -54,23 +54,23 @@
 <body>
   <h1>英雄欠片計算ツール（SX）</h1>
 
-  <label for="grade">現在の英雄グレード：</label>
+  <label for="grade">現在の才能ステージ：</label>
   <select id="grade">
-    <option value="1">グレード 1</option>
-    <option value="2">グレード 2</option>
-    <option value="3">グレード 3</option>
-    <option value="4">グレード 4</option>
-    <option value="5">グレード 5</option>
-    <option value="6">グレード 6</option>
+    <option value="1">ステージ 1</option>
+    <option value="2">ステージ 2</option>
+    <option value="3">ステージ 3</option>
+    <option value="4">ステージ 4</option>
+    <option value="5">ステージ 5</option>
   </select>
 
-  <label>現在の才能レベル：</label>
+  <label>現在の英雄グレード：</label>
   <div id="stars">
     <span class="stars" data-value="1">☆</span>
     <span class="stars" data-value="2">☆</span>
     <span class="stars" data-value="3">☆</span>
     <span class="stars" data-value="4">☆</span>
     <span class="stars" data-value="5">☆</span>
+    <span class="stars" data-value="6">☆</span>
   </div>
 
   <label for="owned">保有している英雄欠片の数：</label>
@@ -112,8 +112,8 @@
     }
 
     function calculate() {
-      const grade = parseInt(document.getElementById("grade").value);
-      const stage = selectedStars;
+      const grade = selectedStars;
+      const stage = parseInt(document.getElementById("grade").value);
       const owned = document.getElementById("owned").value ? parseInt(document.getElementById("owned").value) : 0;
       const owned_general = document.getElementById("owned-general").value ? parseInt(document.getElementById("owned-general").value) : 0;
       const currentTotal = shardTable[grade - 1][stage - 1];
