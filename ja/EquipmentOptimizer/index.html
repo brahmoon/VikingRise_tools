@@ -45,7 +45,7 @@ button.small-btn { padding: 2px 6px; margin: 0 2px; }
 <div class="stock-container">
   <div class="material-block">
     <strong>木</strong>
-    白: <input type="number" id="stock_wood_common" value="0" min="0">
+    <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_wood_common" value="0" min="0">
     <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_wood_uncommon" value="0" min="0">
     <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_wood_rare" value="0" min="0">
     <span style="background-color:#c8b3e6">紫</span>: <input type="number" id="stock_wood_epic" value="0" min="0">
@@ -53,7 +53,7 @@ button.small-btn { padding: 2px 6px; margin: 0 2px; }
   </div>
   <div class="material-block">
     <strong>紐</strong>
-    白: <input type="number" id="stock_rope_common" value="0" min="0">
+    <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_rope_common" value="0" min="0">
     <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_rope_uncommon" value="0" min="0">
     <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_rope_rare" value="0" min="0">
     <span style="background-color:#c8b3e6">紫</span>: <input type="number" id="stock_rope_epic" value="0" min="0">
@@ -61,7 +61,7 @@ button.small-btn { padding: 2px 6px; margin: 0 2px; }
   </div>
   <div class="material-block">
     <strong>布</strong>
-    白: <input type="number" id="stock_cloth_common" value="0" min="0">
+    <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_cloth_common" value="0" min="0">
     <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_cloth_uncommon" value="0" min="0">
     <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_cloth_rare" value="0" min="0">
     <span style="background-color:#c8b3e6">紫</span>: <input type="number" id="stock_cloth_epic" value="0" min="0">
@@ -69,7 +69,7 @@ button.small-btn { padding: 2px 6px; margin: 0 2px; }
   </div>
   <div class="material-block">
     <strong>羽</strong>
-    白: <input type="number" id="stock_feather_common" value="0" min="0">
+    <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_feather_common" value="0" min="0">
     <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_feather_uncommon" value="0" min="0">
     <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_feather_rare" value="0" min="0">
     <span style="background-color:#c8b3e6">紫</span>: <input type="number" id="stock_feather_epic" value="0" min="0">
@@ -77,7 +77,7 @@ button.small-btn { padding: 2px 6px; margin: 0 2px; }
   </div>
   <div class="material-block">
     <strong>皮</strong>
-    白: <input type="number" id="stock_leather_common" value="0" min="0">
+    <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_leather_common" value="0" min="0">
     <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_leather_uncommon" value="0" min="0">
     <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_leather_rare" value="0" min="0">
     <span style="background-color:#c8b3e6">紫</span>: <input type="number" id="stock_leather_epic" value="0" min="0">
@@ -85,7 +85,7 @@ button.small-btn { padding: 2px 6px; margin: 0 2px; }
   </div>
   <div class="material-block">
     <strong>石</strong>
-    白: <input type="number" id="stock_stone_common" value="0" min="0">
+    <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_stone_common" value="0" min="0">
     <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_stone_uncommon" value="0" min="0">
     <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_stone_rare" value="0" min="0">
     <span style="background-color:#c8b3e6">紫</span>: <input type="number" id="stock_stone_epic" value="0" min="0">
@@ -98,7 +98,7 @@ button.small-btn { padding: 2px 6px; margin: 0 2px; }
 <h3>装備一覧（青基準 → 白換算表示）</h3>
 <table id="recipe_table">
 <tr>
-  <th>装備</th>
+  <th>装備（青）</th>
   <th>木</th>
   <th>紐</th>
   <th>布</th>
@@ -180,7 +180,7 @@ function getStockInWhite() {
 
 function showRecipeTable(counts={}) {
   const table = document.getElementById('recipe_table');
-  table.innerHTML = "<tr><th>装備</th><th>木</th><th>紐</th><th>布</th><th>羽</th><th>皮</th><th>石</th><th>作成回数（計算）</th><th>実際作成</th></tr>";
+  table.innerHTML = "<tr><th>装備（青）</th><th>木</th><th>紐</th><th>布</th><th>羽</th><th>皮</th><th>石</th><th>作成回数（計算）</th><th>実際作成</th></tr>";
 
   let totalCount = 0;
 
