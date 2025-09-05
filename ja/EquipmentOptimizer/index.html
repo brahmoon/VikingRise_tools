@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>装備最適化ツール（グレード換算版）</title>
+<style>
+body { font-family: sans-serif; padding: 20px; margin:0; box-sizing:border-box; }
+.wrapper { width: 100%; max-width: 100%; overflow-x: auto; }
+.stock-container { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.stock-container div { display: flex; align-items: center; gap: 5px; }
+input { width: 60px; }
+table { border: 1px solid #ccc; border-collapse: collapse; width: 100%; max-width: 100%; }
+th, td { border: 1px solid #ccc; padding: 5px; text-align: center; }
+th { background-color: #f0f0f0; }
+@media (max-width: 600px) {
+  .stock-container { flex-direction: column; }
+  input { width: 50px; }
+  table { font-size: 12px; }
+}
+</style>
+</head>
+<body>
+<div class="wrapper">
+<h2>装備最適化ツール（グレード換算版）</h2>
+
+<h3>所持素材数を入力</h3>
+<div class="stock-container" id="stockInputs"></div>
+<button id="calculateBtn">計算</button>
+
+<h3>装備一覧（消費素材数-白換算 + 作成回数）</h3>
+<table id="recipe_table">
+<tr>
+  <th>装備</th>
+  <th>木</th>
+  <th>紐</th>
+  <th>布</th>
+  <th>羽</th>
+  <th>皮</th>
+  <th>石</th>
+  <th>作成回数</th>
+</tr>
+</table>
+
+<h3>余った素材（白換算）</h3>
+<ul id="leftover_list"></ul>
+</div>
+
+<script type="module">
+import GLPK from "./lib/index.js";
+
+// グレード換算倍率（白基準）
+const gradeToWhite = {
+  legend: 1024, // 金
+  epic:   256,  // 紫
+  rare:    16,  // 青
+  uncommon: 4,  // 緑
+  common:   1   // 白
+};
+
+const materials = ["木","紐","布","羽","皮","石"];
+const grades = [
+  {key:"legend", label:"金"},
+  {key:"epic",   label:"紫"},
+  {key:"rare",   label:"青"},
+  {key:"uncommon", label:"緑"},
+  {key:"common", label:"白"}
+];
+
+// 所持素材入力欄を動的生成
+const stockContainer = document.getElementById("stockInputs");
+materials.forEach(mat=>{
+  grades.forEach(g=>{
+    const div = document.createElement("div");
+    div.innerHTML = `${mat}（${g.label}）:<input type="number" id="stock_${mat}_${g.key}" value="0" min="0">`;
+    stockContainer.appendChild(div);
+  });
+});
+
+// 元の必要数（青換算）を定義
+const equipmentsBlue = {
+  ハチェット: {木:8, 紐:0, 布:0, 羽:0, 皮:0, 石:6},
+  槍: {木:9, 紐:0, 布:0, 羽:0, 皮:0, 石:4},
+  弓: {木:7, 紐:0, 布:0, 羽:7, 皮:0, 石:3},
+  ボアレザー帽: {木:0, 紐:0, 布:0, 羽:7, 皮:5, 石:0},
+  皮ベルト: {木:0, 紐:5, 布:0, 羽:0, 皮:8, 石:3},
+  粗布のズボン: {木:0, 紐:6, 布:4, 羽:0, 皮:5, 石:0},
+  ヴァイキングシールド: {木:8, 紐:0, 布:0, 羽:0, 皮:0, 石:6},
+  長剣: {木:5, 紐:4, 布:0, 羽:0, 皮:0, 石:7},
+  ヴァイキングメット: {木:0, 紐:4, 布:0, 羽:0, 皮:0, 石:7},
+  オオカミ帽子: {木:0, 紐:0, 布:0, 羽:4, 皮:6, 石:0},
+  粗布のバンダナ: {木:0, 紐:5, 布:5, 羽:0, 皮:0, 石:0},
+  フェルト帽: {木:0, 紐:0, 布:4, 羽:0, 皮:6, 石:0},
+  亜麻の羽織: {木:0, 紐:0, 布:3, 羽:8, 皮:0, 石:0},
+  クローク: {木:0, 紐:0, 布:0, 羽:7, 皮:6, 石:0},
+  粗布の服: {木:0, 紐:4, 布:6, 羽:0, 皮:0, 石:0},
+  羊毛のショール: {木:0, 紐:4, 布:0, 羽:0, 皮:6, 石:0},
+  ショース: {木:0, 紐:0, 布:4, 羽:0, 皮:0, 石:6},
+  亜麻のズボン: {木:0, 紐:6, 布:5, 羽:0, 皮:0, 石:0},
+  粗布の脚絆: {木:0, 紐:6, 布:4, 羽:0, 皮:0, 石:0},
+  靴: {木:0, 紐:0, 布:0, 羽:5, 皮:6, 石:0}
+};
+
+// 青→白換算（×16）
+const equipments = {};
+for(let e in equipmentsBlue){
+  equipments[e] = {};
+  for(let mat of materials){
+    equipments[e][mat] = (equipmentsBlue[e][mat]||0) * gradeToWhite.rare;
+  }
+}
+
+function showRecipeTable(counts={}) {
+  const table = document.getElementById('recipe_table');
+  table.innerHTML = "<tr><th>装備</th><th>木</th><th>紐</th><th>布</th><th>羽</th><th>皮</th><th>石</th><th>作成回数</th></tr>";
+
+  let totalCount = 0;
+  for (let r in equipments) {
+    const count = counts[r] || 0;
+    totalCount += count;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${r}</td>
+                    <td>${equipments[r].木}</td>
+                    <td>${equipments[r].紐}</td>
+                    <td>${equipments[r].布}</td>
+                    <td>${equipments[r].羽}</td>
+                    <td>${equipments[r].皮}</td>
+                    <td>${equipments[r].石}</td>
+                    <td>${count}</td>`;
+    table.appendChild(tr);
+  }
+  const totalDivId = "total_count_div";
+  let totalDiv = document.getElementById(totalDivId);
+  if (!totalDiv) {
+    totalDiv = document.createElement('div');
+    totalDiv.id = totalDivId;
+    totalDiv.style.marginTop = "10px";
+    totalDiv.style.fontWeight = "bold";
+    table.parentNode.appendChild(totalDiv);
+  }
+  totalDiv.textContent = `合計作成回数: ${totalCount}`;
+}
+
+async function calculate() {
+  const glpk = await GLPK();
+
+  // 入力を白換算
+  const stock = {};
+  materials.forEach(mat=>{
+    let totalWhite = 0;
+    grades.forEach(g=>{
+      const v = parseInt(document.getElementById(`stock_${mat}_${g.key}`).value)||0;
+      totalWhite += v * gradeToWhite[g.key];
+    });
+    stock[mat] = totalWhite;
+  });
+
+  const equipNames = Object.keys(equipments);
+
+  const lp = { 
+    name:'EquipOptimization', 
+    objective:{ direction: glpk.GLP_MAX, name:'total', vars:[] }, 
+    subjectTo:[]
+  };
+
+  equipNames.forEach(r => lp.objective.vars.push({ name:r, coef:1 }));
+
+  materials.forEach(mat => {
+    const cons = { name: mat, vars: [], bnds:{ type: glpk.GLP_UP, ub: stock[mat], lb:0 } };
+    equipNames.forEach(r => cons.vars.push({ name:r, coef: equipments[r][mat] }));
+    lp.subjectTo.push(cons);
+  });
+
+  let result;
+  try { result = await glpk.solve(lp, { msglev: glpk.GLP_MSG_OFF }); } 
+  catch(err) { console.error(err); alert("計算中にエラーが発生しました。"); return; }
+
+  const counts = {};
+  equipNames.forEach(r => counts[r] = Math.floor(result.result.vars[r] || 0));
+
+  let leftover = {...stock};
+  for (let r in counts) {
+    const count = counts[r];
+    for (let mat in equipments[r]) {
+      leftover[mat] -= equipments[r][mat]*count;
+    }
+  }
+
+  showRecipeTable(counts);
+
+  const ul = document.getElementById('leftover_list');
+  ul.innerHTML = '';
+  for (let mat in leftover) {
+    const li = document.createElement('li');
+    li.textContent = `${mat}: ${leftover[mat]}`;
+    ul.appendChild(li);
+  }
+}
+
+document.getElementById('calculateBtn').addEventListener('click', calculate);
+showRecipeTable();
+</script>
+</body>
+</html>
