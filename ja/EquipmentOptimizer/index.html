@@ -43,7 +43,6 @@ button.small-btn { padding: 2px 6px; margin: 0 2px; }
 
 <h3>所持素材数を入力</h3>
 <div class="stock-container">
-  <!-- 各素材ブロック（省略せずに並べる） -->
   <div class="material-block">
     <strong>木</strong>
     白: <input type="number" id="stock_wood_common" value="0" min="0">
@@ -113,6 +112,10 @@ button.small-btn { padding: 2px 6px; margin: 0 2px; }
 
 <h3>余った素材（白換算）</h3>
 <ul id="leftover_list"></ul>
+
+<h3>作成可能な合計数</h3>
+<div id="total_possible">0</div>
+
 </div>
 
 <script type="module">
@@ -142,7 +145,7 @@ const equipments = {
 };
 
 const gradeFactor = { common:1, uncommon:4, rare:16, epic:64, legend:256 };
-let actualCounts = {}; // 実際作成カウント
+let actualCounts = {};
 
 function getStockInWhite() {
   const mats = ['wood','rope','cloth','feather','leather','stone'];
@@ -174,10 +177,14 @@ function showRecipeTable(counts={}) {
   const table = document.getElementById('recipe_table');
   table.innerHTML = "<tr><th>装備</th><th>木</th><th>紐</th><th>布</th><th>羽</th><th>皮</th><th>石</th><th>作成回数（計算）</th><th>実際作成</th></tr>";
 
+  let totalCount = 0;
+
   for (let r in equipments) {
     if (!(r in actualCounts)) actualCounts[r] = 0;
     const tr = document.createElement('tr');
     const count = counts[r] || 0;
+    totalCount += count;
+
     if (count > 0) tr.classList.add("highlight");
 
     const tdActual = document.createElement('td');
@@ -204,17 +211,21 @@ function showRecipeTable(counts={}) {
     tdActual.appendChild(input);
     tdActual.appendChild(btnPlus);
 
-    tr.innerHTML = `<td>${r}</td>
-                    <td>${equipments[r].木*16}</td>
-                    <td>${equipments[r].紐*16}</td>
-                    <td>${equipments[r].布*16}</td>
-                    <td>${equipments[r].羽*16}</td>
-                    <td>${equipments[r].皮*16}</td>
-                    <td>${equipments[r].石*16}</td>
-                    <td>${count}</td>`;
+    const tdHtml = `<td>${r}</td>
+      <td>${equipments[r].木*16 + equipments[r].木*4 + equipments[r].木*1}</td>
+      <td>${equipments[r].紐*16 + equipments[r].紐*4 + equipments[r].紐*1}</td>
+      <td>${equipments[r].布*16 + equipments[r].布*4 + equipments[r].布*1}</td>
+      <td>${equipments[r].羽*16 + equipments[r].羽*4 + equipments[r].羽*1}</td>
+      <td>${equipments[r].皮*16 + equipments[r].皮*4 + equipments[r].皮*1}</td>
+      <td>${equipments[r].石*16 + equipments[r].石*4 + equipments[r].石*1}</td>
+      <td>${count}</td>`;
+
+    tr.innerHTML = tdHtml;
     tr.appendChild(tdActual);
     table.appendChild(tr);
   }
+
+  document.getElementById('total_possible').textContent = totalCount;
 }
 
 async function calculate() {
@@ -223,21 +234,28 @@ async function calculate() {
   const equipNames = Object.keys(equipments);
   const lp = { name:'EquipOptimization', objective:{ direction: glpk.GLP_MAX, name:'total', vars:[] }, subjectTo:[] };
   equipNames.forEach(r => lp.objective.vars.push({ name:r, coef:1 }));
+
   ['木','紐','布','羽','皮','石'].forEach(mat => {
     const cons = { name: mat, vars: [], bnds:{ type: glpk.GLP_UP, ub: stock[mat], lb:0 } };
-    equipNames.forEach(r => cons.vars.push({ name:r, coef: equipments[r][mat]*16 }));
+    equipNames.forEach(r => {
+      const required = equipments[r][mat]*16 + equipments[r][mat]*4 + equipments[r][mat]*1;
+      cons.vars.push({ name:r, coef: required });
+    });
     lp.subjectTo.push(cons);
   });
+
   let result;
   try { result = await glpk.solve(lp, { msglev: glpk.GLP_MSG_OFF }); }
   catch(err) { console.error(err); alert("計算中にエラーが発生しました。"); return; }
+
   const counts = {};
   equipNames.forEach(r => counts[r] = Math.floor(result.result.vars[r] || 0));
   showRecipeTable(counts);
+
   let leftover = {...stock};
   for (let r in counts) {
     const count = counts[r];
-    for (let mat in equipments[r]) leftover[mat] -= equipments[r][mat]*16*count;
+    for (let mat in equipments[r]) leftover[mat] -= (equipments[r][mat]*16 + equipments[r][mat]*4 + equipments[r][mat]*1) * count;
   }
   const ul = document.getElementById('leftover_list');
   ul.innerHTML = '';
@@ -247,6 +265,7 @@ async function calculate() {
     ul.appendChild(li);
   }
 }
+
 document.getElementById('calculateBtn').addEventListener('click', calculate);
 showRecipeTable();
 </script>
