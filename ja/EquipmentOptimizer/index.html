@@ -26,6 +26,7 @@ body { font-family: sans-serif; padding: 20px; margin:0; box-sizing:border-box; 
 table { border: 1px solid #ccc; border-collapse: collapse; width: 100%; max-width: 100%; }
 th, td { border: 1px solid #ccc; padding: 5px; text-align: center; }
 th { background-color: #f0f0f0; }
+tr.highlight { background-color: #f9f9e5; } /* 作成可能な装備の行を薄く着色 */
 @media (max-width: 600px) {
   .stock-container { flex-direction: column; }
   .material-block { min-width: 100%; }
@@ -143,18 +144,11 @@ const equipments = {
 };
 
 // グレード係数（白基準）
-const gradeFactor = {
-  common: 1,
-  uncommon: 4,
-  rare: 16,
-  epic: 64,
-  legend: 256
-};
+const gradeFactor = { common:1, uncommon:4, rare:16, epic:64, legend:256 };
 
 function getStockInWhite() {
   const mats = ['wood','rope','cloth','feather','leather','stone'];
   const stock = {木:0, 紐:0, 布:0, 羽:0, 皮:0, 石:0};
-
   mats.forEach(mat=>{
     const values = {
       common: parseInt(document.getElementById(`stock_${mat}_common`).value) || 0,
@@ -163,13 +157,11 @@ function getStockInWhite() {
       epic: parseInt(document.getElementById(`stock_${mat}_epic`).value) || 0,
       legend: parseInt(document.getElementById(`stock_${mat}_legend`).value) || 0
     };
-    const whiteEquivalent = 
-      values.common*gradeFactor.common +
-      values.uncommon*gradeFactor.uncommon +
-      values.rare*gradeFactor.rare +
-      values.epic*gradeFactor.epic +
-      values.legend*gradeFactor.legend;
-
+    const whiteEquivalent = values.common*gradeFactor.common +
+                            values.uncommon*gradeFactor.uncommon +
+                            values.rare*gradeFactor.rare +
+                            values.epic*gradeFactor.epic +
+                            values.legend*gradeFactor.legend;
     if(mat==="wood") stock.木 = whiteEquivalent;
     if(mat==="rope") stock.紐 = whiteEquivalent;
     if(mat==="cloth") stock.布 = whiteEquivalent;
@@ -177,7 +169,6 @@ function getStockInWhite() {
     if(mat==="leather") stock.皮 = whiteEquivalent;
     if(mat==="stone") stock.石 = whiteEquivalent;
   });
-
   return stock;
 }
 
@@ -186,11 +177,11 @@ function showRecipeTable(counts={}) {
   table.innerHTML = "<tr><th>装備</th><th>木</th><th>紐</th><th>布</th><th>羽</th><th>皮</th><th>石</th><th>作成回数</th></tr>";
 
   let totalCount = 0;
-
   for (let r in equipments) {
     const tr = document.createElement('tr');
     const count = counts[r] || 0;
     totalCount += count;
+    if (count > 0) tr.classList.add("highlight"); // ← 作成回数が1以上なら色付け
     tr.innerHTML = `<td>${r}</td>
                     <td>${equipments[r].木*16}</td>
                     <td>${equipments[r].紐*16}</td>
@@ -201,7 +192,6 @@ function showRecipeTable(counts={}) {
                     <td>${count}</td>`;
     table.appendChild(tr);
   }
-
   // 合計表示
   const totalDivId = "total_count_div";
   let totalDiv = document.getElementById(totalDivId);
@@ -219,40 +209,28 @@ async function calculate() {
   const glpk = await GLPK();
   const stock = getStockInWhite();
   const equipNames = Object.keys(equipments);
-
   const lp = { 
     name:'EquipOptimization', 
     objective:{ direction: glpk.GLP_MAX, name:'total', vars:[] }, 
     subjectTo:[]
   };
-
-  equipNames.forEach(r => {
-    lp.objective.vars.push({ name:r, coef:1 });
-  });
-
+  equipNames.forEach(r => { lp.objective.vars.push({ name:r, coef:1 }); });
   ['木','紐','布','羽','皮','石'].forEach(mat => {
     const cons = { name: mat, vars: [], bnds:{ type: glpk.GLP_UP, ub: stock[mat], lb:0 } };
     equipNames.forEach(r => cons.vars.push({ name:r, coef: equipments[r][mat]*16 }));
     lp.subjectTo.push(cons);
   });
-
   let result;
   try { result = await glpk.solve(lp, { msglev: glpk.GLP_MSG_OFF }); } 
   catch(err) { console.error(err); alert("計算中にエラーが発生しました。"); return; }
-
   const counts = {};
   equipNames.forEach(r => counts[r] = Math.floor(result.result.vars[r] || 0));
-
   let leftover = {...stock};
   for (let r in counts) {
     const count = counts[r];
-    for (let mat in equipments[r]) {
-      leftover[mat] -= equipments[r][mat]*16*count;
-    }
+    for (let mat in equipments[r]) leftover[mat] -= equipments[r][mat]*16*count;
   }
-
   showRecipeTable(counts);
-
   const ul = document.getElementById('leftover_list');
   ul.innerHTML = '';
   for (let mat in leftover) {
@@ -261,7 +239,6 @@ async function calculate() {
     ul.appendChild(li);
   }
 }
-
 document.getElementById('calculateBtn').addEventListener('click', calculate);
 showRecipeTable();
 </script>
