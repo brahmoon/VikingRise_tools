@@ -26,7 +26,9 @@ body { font-family: sans-serif; padding: 20px; margin:0; box-sizing:border-box; 
 table { border: 1px solid #ccc; border-collapse: collapse; width: 100%; max-width: 100%; }
 th, td { border: 1px solid #ccc; padding: 5px; text-align: center; }
 th { background-color: #f0f0f0; }
-tr.highlight { background-color: #f9f9e5; } /* 作成可能な装備の行を薄く着色 */
+tr.highlight { background-color: #f9f9e5; }
+.count-box { width: 40px; text-align: center; }
+button.small-btn { padding: 2px 6px; margin: 0 2px; }
 @media (max-width: 600px) {
   .stock-container { flex-direction: column; }
   .material-block { min-width: 100%; }
@@ -41,7 +43,7 @@ tr.highlight { background-color: #f9f9e5; } /* 作成可能な装備の行を薄
 
 <h3>所持素材数を入力</h3>
 <div class="stock-container">
-
+  <!-- 各素材ブロック（省略せずに並べる） -->
   <div class="material-block">
     <strong>木</strong>
     白: <input type="number" id="stock_wood_common" value="0" min="0">
@@ -50,7 +52,6 @@ tr.highlight { background-color: #f9f9e5; } /* 作成可能な装備の行を薄
     紫: <input type="number" id="stock_wood_epic" value="0" min="0">
     金: <input type="number" id="stock_wood_legend" value="0" min="0">
   </div>
-
   <div class="material-block">
     <strong>紐</strong>
     白: <input type="number" id="stock_rope_common" value="0" min="0">
@@ -59,7 +60,6 @@ tr.highlight { background-color: #f9f9e5; } /* 作成可能な装備の行を薄
     紫: <input type="number" id="stock_rope_epic" value="0" min="0">
     金: <input type="number" id="stock_rope_legend" value="0" min="0">
   </div>
-
   <div class="material-block">
     <strong>布</strong>
     白: <input type="number" id="stock_cloth_common" value="0" min="0">
@@ -68,7 +68,6 @@ tr.highlight { background-color: #f9f9e5; } /* 作成可能な装備の行を薄
     紫: <input type="number" id="stock_cloth_epic" value="0" min="0">
     金: <input type="number" id="stock_cloth_legend" value="0" min="0">
   </div>
-
   <div class="material-block">
     <strong>羽</strong>
     白: <input type="number" id="stock_feather_common" value="0" min="0">
@@ -77,7 +76,6 @@ tr.highlight { background-color: #f9f9e5; } /* 作成可能な装備の行を薄
     紫: <input type="number" id="stock_feather_epic" value="0" min="0">
     金: <input type="number" id="stock_feather_legend" value="0" min="0">
   </div>
-
   <div class="material-block">
     <strong>皮</strong>
     白: <input type="number" id="stock_leather_common" value="0" min="0">
@@ -86,7 +84,6 @@ tr.highlight { background-color: #f9f9e5; } /* 作成可能な装備の行を薄
     紫: <input type="number" id="stock_leather_epic" value="0" min="0">
     金: <input type="number" id="stock_leather_legend" value="0" min="0">
   </div>
-
   <div class="material-block">
     <strong>石</strong>
     白: <input type="number" id="stock_stone_common" value="0" min="0">
@@ -95,8 +92,8 @@ tr.highlight { background-color: #f9f9e5; } /* 作成可能な装備の行を薄
     紫: <input type="number" id="stock_stone_epic" value="0" min="0">
     金: <input type="number" id="stock_stone_legend" value="0" min="0">
   </div>
-
 </div>
+
 <button id="calculateBtn">計算</button>
 
 <h3>装備一覧（青基準 → 白換算表示）</h3>
@@ -109,7 +106,8 @@ tr.highlight { background-color: #f9f9e5; } /* 作成可能な装備の行を薄
   <th>羽</th>
   <th>皮</th>
   <th>石</th>
-  <th>作成回数</th>
+  <th>作成回数（計算）</th>
+  <th>実際作成</th>
 </tr>
 </table>
 
@@ -143,8 +141,8 @@ const equipments = {
   靴: {木:0, 紐:0, 布:0, 羽:5, 皮:6, 石:0}
 };
 
-// グレード係数（白基準）
 const gradeFactor = { common:1, uncommon:4, rare:16, epic:64, legend:256 };
+let actualCounts = {}; // 実際作成カウント
 
 function getStockInWhite() {
   const mats = ['wood','rope','cloth','feather','leather','stone'];
@@ -174,14 +172,38 @@ function getStockInWhite() {
 
 function showRecipeTable(counts={}) {
   const table = document.getElementById('recipe_table');
-  table.innerHTML = "<tr><th>装備</th><th>木</th><th>紐</th><th>布</th><th>羽</th><th>皮</th><th>石</th><th>作成回数</th></tr>";
+  table.innerHTML = "<tr><th>装備</th><th>木</th><th>紐</th><th>布</th><th>羽</th><th>皮</th><th>石</th><th>作成回数（計算）</th><th>実際作成</th></tr>";
 
-  let totalCount = 0;
   for (let r in equipments) {
+    if (!(r in actualCounts)) actualCounts[r] = 0;
     const tr = document.createElement('tr');
     const count = counts[r] || 0;
-    totalCount += count;
-    if (count > 0) tr.classList.add("highlight"); // ← 作成回数が1以上なら色付け
+    if (count > 0) tr.classList.add("highlight");
+
+    const tdActual = document.createElement('td');
+    const btnMinus = document.createElement('button');
+    btnMinus.textContent = "-";
+    btnMinus.className = "small-btn";
+    btnMinus.onclick = () => {
+      actualCounts[r] = Math.max(0, actualCounts[r]-1);
+      input.value = actualCounts[r];
+    };
+    const input = document.createElement('input');
+    input.type = "number";
+    input.value = actualCounts[r];
+    input.className = "count-box";
+    input.onchange = () => { actualCounts[r] = parseInt(input.value)||0; };
+    const btnPlus = document.createElement('button');
+    btnPlus.textContent = "+";
+    btnPlus.className = "small-btn";
+    btnPlus.onclick = () => {
+      actualCounts[r]++;
+      input.value = actualCounts[r];
+    };
+    tdActual.appendChild(btnMinus);
+    tdActual.appendChild(input);
+    tdActual.appendChild(btnPlus);
+
     tr.innerHTML = `<td>${r}</td>
                     <td>${equipments[r].木*16}</td>
                     <td>${equipments[r].紐*16}</td>
@@ -190,47 +212,33 @@ function showRecipeTable(counts={}) {
                     <td>${equipments[r].皮*16}</td>
                     <td>${equipments[r].石*16}</td>
                     <td>${count}</td>`;
+    tr.appendChild(tdActual);
     table.appendChild(tr);
   }
-  // 合計表示
-  const totalDivId = "total_count_div";
-  let totalDiv = document.getElementById(totalDivId);
-  if (!totalDiv) {
-    totalDiv = document.createElement('div');
-    totalDiv.id = totalDivId;
-    totalDiv.style.marginTop = "10px";
-    totalDiv.style.fontWeight = "bold";
-    table.parentNode.appendChild(totalDiv);
-  }
-  totalDiv.textContent = `合計作成回数: ${totalCount}`;
 }
 
 async function calculate() {
   const glpk = await GLPK();
   const stock = getStockInWhite();
   const equipNames = Object.keys(equipments);
-  const lp = { 
-    name:'EquipOptimization', 
-    objective:{ direction: glpk.GLP_MAX, name:'total', vars:[] }, 
-    subjectTo:[]
-  };
-  equipNames.forEach(r => { lp.objective.vars.push({ name:r, coef:1 }); });
+  const lp = { name:'EquipOptimization', objective:{ direction: glpk.GLP_MAX, name:'total', vars:[] }, subjectTo:[] };
+  equipNames.forEach(r => lp.objective.vars.push({ name:r, coef:1 }));
   ['木','紐','布','羽','皮','石'].forEach(mat => {
     const cons = { name: mat, vars: [], bnds:{ type: glpk.GLP_UP, ub: stock[mat], lb:0 } };
     equipNames.forEach(r => cons.vars.push({ name:r, coef: equipments[r][mat]*16 }));
     lp.subjectTo.push(cons);
   });
   let result;
-  try { result = await glpk.solve(lp, { msglev: glpk.GLP_MSG_OFF }); } 
+  try { result = await glpk.solve(lp, { msglev: glpk.GLP_MSG_OFF }); }
   catch(err) { console.error(err); alert("計算中にエラーが発生しました。"); return; }
   const counts = {};
   equipNames.forEach(r => counts[r] = Math.floor(result.result.vars[r] || 0));
+  showRecipeTable(counts);
   let leftover = {...stock};
   for (let r in counts) {
     const count = counts[r];
     for (let mat in equipments[r]) leftover[mat] -= equipments[r][mat]*16*count;
   }
-  showRecipeTable(counts);
   const ul = document.getElementById('leftover_list');
   ul.innerHTML = '';
   for (let mat in leftover) {
