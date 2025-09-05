@@ -201,8 +201,8 @@ function showRecipeTable(counts={}) {
     input.className = "count-box";
     input.onchange = () => {
       actualCounts[r] = parseInt(input.value)||0;
-      if(input.value >= input.closest('tr').children[7].innerHTML) input.closest('tr').classList.remove('highlight');
-      if(input.value < input.closest('tr').children[7].innerHTML && !classList.contains('highlight')) input.closest('tr').classList.add('highlight');
+      if(input.value >= parseInt(input.closest('tr').children[7].innerHTML)) input.closest('tr').classList.remove('highlight');
+      if(input.value < parseInt(input.closest('tr').children[7].innerHTML) && !input.closest('tr').classList.contains('highlight')) input.closest('tr').classList.add('highlight');
     };
     const btnPlus = document.createElement('button');
     btnPlus.textContent = "+";
