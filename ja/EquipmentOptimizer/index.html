@@ -3,18 +3,32 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>装備最適化ツール（グレード換算版）</title>
+<title>基本装備最適化ツール</title>
 <style>
 body { font-family: sans-serif; padding: 20px; margin:0; box-sizing:border-box; }
 .wrapper { width: 100%; max-width: 100%; overflow-x: auto; }
 .stock-container { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
-.stock-container div { display: flex; align-items: center; gap: 5px; }
-input { width: 60px; }
+.material-block {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 8px;
+  min-width: 260px;
+  flex: 1 1 280px;
+}
+.material-block strong {
+  display: block;
+  margin-bottom: 4px;
+}
+.material-block input {
+  width: 55px;
+  margin: 2px 3px;
+}
 table { border: 1px solid #ccc; border-collapse: collapse; width: 100%; max-width: 100%; }
 th, td { border: 1px solid #ccc; padding: 5px; text-align: center; }
 th { background-color: #f0f0f0; }
 @media (max-width: 600px) {
   .stock-container { flex-direction: column; }
+  .material-block { min-width: 100%; }
   input { width: 50px; }
   table { font-size: 12px; }
 }
@@ -22,13 +36,69 @@ th { background-color: #f0f0f0; }
 </head>
 <body>
 <div class="wrapper">
-<h2>装備最適化ツール（グレード換算版）</h2>
+<h2>基本装備最適化ツール</h2>
 
 <h3>所持素材数を入力</h3>
-<div class="stock-container" id="stockInputs"></div>
+<div class="stock-container">
+
+  <div class="material-block">
+    <strong>木</strong>
+    白: <input type="number" id="stock_wood_common" value="0" min="0">
+    緑: <input type="number" id="stock_wood_uncommon" value="0" min="0">
+    青: <input type="number" id="stock_wood_rare" value="0" min="0">
+    紫: <input type="number" id="stock_wood_epic" value="0" min="0">
+    金: <input type="number" id="stock_wood_legend" value="0" min="0">
+  </div>
+
+  <div class="material-block">
+    <strong>紐</strong>
+    白: <input type="number" id="stock_rope_common" value="0" min="0">
+    緑: <input type="number" id="stock_rope_uncommon" value="0" min="0">
+    青: <input type="number" id="stock_rope_rare" value="0" min="0">
+    紫: <input type="number" id="stock_rope_epic" value="0" min="0">
+    金: <input type="number" id="stock_rope_legend" value="0" min="0">
+  </div>
+
+  <div class="material-block">
+    <strong>布</strong>
+    白: <input type="number" id="stock_cloth_common" value="0" min="0">
+    緑: <input type="number" id="stock_cloth_uncommon" value="0" min="0">
+    青: <input type="number" id="stock_cloth_rare" value="0" min="0">
+    紫: <input type="number" id="stock_cloth_epic" value="0" min="0">
+    金: <input type="number" id="stock_cloth_legend" value="0" min="0">
+  </div>
+
+  <div class="material-block">
+    <strong>羽</strong>
+    白: <input type="number" id="stock_feather_common" value="0" min="0">
+    緑: <input type="number" id="stock_feather_uncommon" value="0" min="0">
+    青: <input type="number" id="stock_feather_rare" value="0" min="0">
+    紫: <input type="number" id="stock_feather_epic" value="0" min="0">
+    金: <input type="number" id="stock_feather_legend" value="0" min="0">
+  </div>
+
+  <div class="material-block">
+    <strong>皮</strong>
+    白: <input type="number" id="stock_leather_common" value="0" min="0">
+    緑: <input type="number" id="stock_leather_uncommon" value="0" min="0">
+    青: <input type="number" id="stock_leather_rare" value="0" min="0">
+    紫: <input type="number" id="stock_leather_epic" value="0" min="0">
+    金: <input type="number" id="stock_leather_legend" value="0" min="0">
+  </div>
+
+  <div class="material-block">
+    <strong>石</strong>
+    白: <input type="number" id="stock_stone_common" value="0" min="0">
+    緑: <input type="number" id="stock_stone_uncommon" value="0" min="0">
+    青: <input type="number" id="stock_stone_rare" value="0" min="0">
+    紫: <input type="number" id="stock_stone_epic" value="0" min="0">
+    金: <input type="number" id="stock_stone_legend" value="0" min="0">
+  </div>
+
+</div>
 <button id="calculateBtn">計算</button>
 
-<h3>装備一覧（消費素材数-白換算 + 作成回数）</h3>
+<h3>装備一覧（青基準 → 白換算表示）</h3>
 <table id="recipe_table">
 <tr>
   <th>装備</th>
@@ -49,36 +119,7 @@ th { background-color: #f0f0f0; }
 <script type="module">
 import GLPK from "./lib/index.js";
 
-// グレード換算倍率（白基準）
-const gradeToWhite = {
-  legend: 1024, // 金
-  epic:   256,  // 紫
-  rare:    16,  // 青
-  uncommon: 4,  // 緑
-  common:   1   // 白
-};
-
-const materials = ["木","紐","布","羽","皮","石"];
-const grades = [
-  {key:"legend", label:"金"},
-  {key:"epic",   label:"紫"},
-  {key:"rare",   label:"青"},
-  {key:"uncommon", label:"緑"},
-  {key:"common", label:"白"}
-];
-
-// 所持素材入力欄を動的生成
-const stockContainer = document.getElementById("stockInputs");
-materials.forEach(mat=>{
-  grades.forEach(g=>{
-    const div = document.createElement("div");
-    div.innerHTML = `${mat}（${g.label}）:<input type="number" id="stock_${mat}_${g.key}" value="0" min="0">`;
-    stockContainer.appendChild(div);
-  });
-});
-
-// 元の必要数（青換算）を定義
-const equipmentsBlue = {
+const equipments = {
   ハチェット: {木:8, 紐:0, 布:0, 羽:0, 皮:0, 石:6},
   槍: {木:9, 紐:0, 布:0, 羽:0, 皮:0, 石:4},
   弓: {木:7, 紐:0, 布:0, 羽:7, 皮:0, 石:3},
@@ -101,13 +142,43 @@ const equipmentsBlue = {
   靴: {木:0, 紐:0, 布:0, 羽:5, 皮:6, 石:0}
 };
 
-// 青→白換算（×16）
-const equipments = {};
-for(let e in equipmentsBlue){
-  equipments[e] = {};
-  for(let mat of materials){
-    equipments[e][mat] = (equipmentsBlue[e][mat]||0) * gradeToWhite.rare;
-  }
+// グレード係数（白基準）
+const gradeFactor = {
+  common: 1,
+  uncommon: 4,
+  rare: 16,
+  epic: 64,
+  legend: 256
+};
+
+function getStockInWhite() {
+  const mats = ['wood','rope','cloth','feather','leather','stone'];
+  const stock = {木:0, 紐:0, 布:0, 羽:0, 皮:0, 石:0};
+
+  mats.forEach(mat=>{
+    const values = {
+      common: parseInt(document.getElementById(`stock_${mat}_common`).value) || 0,
+      uncommon: parseInt(document.getElementById(`stock_${mat}_uncommon`).value) || 0,
+      rare: parseInt(document.getElementById(`stock_${mat}_rare`).value) || 0,
+      epic: parseInt(document.getElementById(`stock_${mat}_epic`).value) || 0,
+      legend: parseInt(document.getElementById(`stock_${mat}_legend`).value) || 0
+    };
+    const whiteEquivalent = 
+      values.common*gradeFactor.common +
+      values.uncommon*gradeFactor.uncommon +
+      values.rare*gradeFactor.rare +
+      values.epic*gradeFactor.epic +
+      values.legend*gradeFactor.legend;
+
+    if(mat==="wood") stock.木 = whiteEquivalent;
+    if(mat==="rope") stock.紐 = whiteEquivalent;
+    if(mat==="cloth") stock.布 = whiteEquivalent;
+    if(mat==="feather") stock.羽 = whiteEquivalent;
+    if(mat==="leather") stock.皮 = whiteEquivalent;
+    if(mat==="stone") stock.石 = whiteEquivalent;
+  });
+
+  return stock;
 }
 
 function showRecipeTable(counts={}) {
@@ -115,20 +186,23 @@ function showRecipeTable(counts={}) {
   table.innerHTML = "<tr><th>装備</th><th>木</th><th>紐</th><th>布</th><th>羽</th><th>皮</th><th>石</th><th>作成回数</th></tr>";
 
   let totalCount = 0;
+
   for (let r in equipments) {
+    const tr = document.createElement('tr');
     const count = counts[r] || 0;
     totalCount += count;
-    const tr = document.createElement('tr');
     tr.innerHTML = `<td>${r}</td>
-                    <td>${equipments[r].木}</td>
-                    <td>${equipments[r].紐}</td>
-                    <td>${equipments[r].布}</td>
-                    <td>${equipments[r].羽}</td>
-                    <td>${equipments[r].皮}</td>
-                    <td>${equipments[r].石}</td>
+                    <td>${equipments[r].木*16}</td>
+                    <td>${equipments[r].紐*16}</td>
+                    <td>${equipments[r].布*16}</td>
+                    <td>${equipments[r].羽*16}</td>
+                    <td>${equipments[r].皮*16}</td>
+                    <td>${equipments[r].石*16}</td>
                     <td>${count}</td>`;
     table.appendChild(tr);
   }
+
+  // 合計表示
   const totalDivId = "total_count_div";
   let totalDiv = document.getElementById(totalDivId);
   if (!totalDiv) {
@@ -143,18 +217,7 @@ function showRecipeTable(counts={}) {
 
 async function calculate() {
   const glpk = await GLPK();
-
-  // 入力を白換算
-  const stock = {};
-  materials.forEach(mat=>{
-    let totalWhite = 0;
-    grades.forEach(g=>{
-      const v = parseInt(document.getElementById(`stock_${mat}_${g.key}`).value)||0;
-      totalWhite += v * gradeToWhite[g.key];
-    });
-    stock[mat] = totalWhite;
-  });
-
+  const stock = getStockInWhite();
   const equipNames = Object.keys(equipments);
 
   const lp = { 
@@ -163,11 +226,13 @@ async function calculate() {
     subjectTo:[]
   };
 
-  equipNames.forEach(r => lp.objective.vars.push({ name:r, coef:1 }));
+  equipNames.forEach(r => {
+    lp.objective.vars.push({ name:r, coef:1 });
+  });
 
-  materials.forEach(mat => {
+  ['木','紐','布','羽','皮','石'].forEach(mat => {
     const cons = { name: mat, vars: [], bnds:{ type: glpk.GLP_UP, ub: stock[mat], lb:0 } };
-    equipNames.forEach(r => cons.vars.push({ name:r, coef: equipments[r][mat] }));
+    equipNames.forEach(r => cons.vars.push({ name:r, coef: equipments[r][mat]*16 }));
     lp.subjectTo.push(cons);
   });
 
@@ -182,7 +247,7 @@ async function calculate() {
   for (let r in counts) {
     const count = counts[r];
     for (let mat in equipments[r]) {
-      leftover[mat] -= equipments[r][mat]*count;
+      leftover[mat] -= equipments[r][mat]*16*count;
     }
   }
 
