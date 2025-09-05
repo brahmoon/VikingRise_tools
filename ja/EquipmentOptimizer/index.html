@@ -267,8 +267,9 @@ async function calculate() {
 
   //カウントリセット
   let countBox = Array.from(document.getElementsByClassName('count-box'));
-  for (let r in equipments) {
-    countBox[r].value = 0;
+  countBox.forEach(input => input.value = 0);
+
+  for (let r in actualCounts) {
     actualCounts[r] = 0;
   }
 }
