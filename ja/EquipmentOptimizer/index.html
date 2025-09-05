@@ -199,7 +199,7 @@ function showRecipeTable(counts={}) {
     btnMinus.onclick = () => {
       actualCounts[r] = Math.max(0, actualCounts[r]-1);
       input.value = actualCounts[r];
-      updateHighlight(input);
+      updateHighlight(btnMinus);
     };
     const input = document.createElement('input');
     input.type = "number";
@@ -215,7 +215,7 @@ function showRecipeTable(counts={}) {
     btnPlus.onclick = () => {
       actualCounts[r]++;
       input.value = actualCounts[r];
-      updateHighlight(input);
+      updateHighlight(btnPlus);
     };
     tdActual.appendChild(btnMinus);
     tdActual.appendChild(input);
