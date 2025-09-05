@@ -149,7 +149,7 @@ let actualCounts = {};
 
 function updateHighlight(element) {
   if(element.value >= parseInt(element.closest('tr').children[7].innerHTML)) element.closest('tr').classList.remove('highlight');
-  if(element.value < parseInt(input.closest('tr').children[7].innerHTML) && !element.closest('tr').classList.contains('highlight')) element.closest('tr').classList.add('highlight');
+  if(element.value < parseInt(element.closest('tr').children[7].innerHTML) && !element.closest('tr').classList.contains('highlight')) element.closest('tr').classList.add('highlight');
 }
 
 function getStockInWhite() {
