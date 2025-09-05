@@ -147,6 +147,11 @@ const equipments = {
 const gradeFactor = { common:1, uncommon:4, rare:16, epic:64, legend:256 };
 let actualCounts = {};
 
+function updateHighlight(element) {
+  if(element.value >= parseInt(element.closest('tr').children[7].innerHTML)) element.closest('tr').classList.remove('highlight');
+  if(element.value < parseInt(input.closest('tr').children[7].innerHTML) && !element.closest('tr').classList.contains('highlight')) element.closest('tr').classList.add('highlight');
+}
+
 function getStockInWhite() {
   const mats = ['wood','rope','cloth','feather','leather','stone'];
   const stock = {木:0, 紐:0, 布:0, 羽:0, 皮:0, 石:0};
@@ -194,6 +199,7 @@ function showRecipeTable(counts={}) {
     btnMinus.onclick = () => {
       actualCounts[r] = Math.max(0, actualCounts[r]-1);
       input.value = actualCounts[r];
+      updateHighlight(input);
     };
     const input = document.createElement('input');
     input.type = "number";
@@ -201,8 +207,7 @@ function showRecipeTable(counts={}) {
     input.className = "count-box";
     input.onchange = () => {
       actualCounts[r] = parseInt(input.value)||0;
-      if(input.value >= parseInt(input.closest('tr').children[7].innerHTML)) input.closest('tr').classList.remove('highlight');
-      if(input.value < parseInt(input.closest('tr').children[7].innerHTML) && !input.closest('tr').classList.contains('highlight')) input.closest('tr').classList.add('highlight');
+      updateHighlight(input);
     };
     const btnPlus = document.createElement('button');
     btnPlus.textContent = "+";
@@ -210,6 +215,7 @@ function showRecipeTable(counts={}) {
     btnPlus.onclick = () => {
       actualCounts[r]++;
       input.value = actualCounts[r];
+      updateHighlight(input);
     };
     tdActual.appendChild(btnMinus);
     tdActual.appendChild(input);
