@@ -266,7 +266,7 @@ async function calculate() {
   }
 
   //カウントリセット
-  (Array.from(document.getElementsByClassName('count-box'))).map(x => x.value = 0);
+  (Array.from(document.getElementsByClassName('count-box'))).map(x => x.value = parseInt(0));
   actualCounts = (Array.from(document.getElementsByClassName('count-box'))).map(x => parseInt(x.value));
   console.log(actualCounts);
 }
