@@ -266,9 +266,11 @@ async function calculate() {
   }
 
   //カウントリセット
-  (Array.from(document.getElementsByClassName('count-box'))).map(x => x.value = parseInt(0));
-  actualCounts = (Array.from(document.getElementsByClassName('count-box'))).map(x => parseInt(x.value));
-  console.log(actualCounts);
+  let countBox = Array.from(document.getElementsByClassName('count-box'));
+  for (let r in equipments) {
+    countBox[r].value = 0;
+    actualCounts[r] = 0;
+  }
 }
 
 document.getElementById('calculateBtn').addEventListener('click', calculate);
