@@ -15,9 +15,13 @@ body { font-family: sans-serif; padding: 20px; margin:0; box-sizing:border-box; 
   min-width: 260px;
   flex: 1 1 280px;
 }
+.material-name {
+  display: flex;
+}
 .material-block strong {
   display: block;
   margin-bottom: 4px;
+  margin-left: 8px;
 }
 .material-block input {
   width: 55px;
@@ -44,7 +48,10 @@ button.small-btn { padding: 2px 6px; margin: 0 2px; }
 <h3>所持素材数を入力</h3>
 <div class="stock-container">
   <div class="material-block">
-    <strong>木</strong>
+    <div class="material-name">
+      <img src="img/wood.png" width="16" height="16">
+      <strong>木</strong>
+    </div>
     <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_wood_common" value="0" min="0">
     <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_wood_uncommon" value="0" min="0">
     <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_wood_rare" value="0" min="0">
@@ -52,7 +59,10 @@ button.small-btn { padding: 2px 6px; margin: 0 2px; }
     <span style="background-color:#e8d687">金</span>: <input type="number" id="stock_wood_legend" value="0" min="0">
   </div>
   <div class="material-block">
-    <strong>紐</strong>
+    <div class="material-name">
+      <img src="img/rope.png" width="16" height="16">
+      <strong>紐</strong>
+    </div>
     <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_rope_common" value="0" min="0">
     <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_rope_uncommon" value="0" min="0">
     <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_rope_rare" value="0" min="0">
@@ -60,7 +70,10 @@ button.small-btn { padding: 2px 6px; margin: 0 2px; }
     <span style="background-color:#e8d687">金</span>: <input type="number" id="stock_rope_legend" value="0" min="0">
   </div>
   <div class="material-block">
-    <strong>布</strong>
+    <div class="material-name">
+      <img src="img/cloth.png" width="16" height="16">
+      <strong>布</strong>
+    </div>
     <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_cloth_common" value="0" min="0">
     <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_cloth_uncommon" value="0" min="0">
     <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_cloth_rare" value="0" min="0">
@@ -68,7 +81,10 @@ button.small-btn { padding: 2px 6px; margin: 0 2px; }
     <span style="background-color:#e8d687">金</span>: <input type="number" id="stock_cloth_legend" value="0" min="0">
   </div>
   <div class="material-block">
-    <strong>羽</strong>
+    <div class="material-name">
+      <img src="img/feather.png" width="16" height="16">
+      <strong>羽</strong>
+    </div>
     <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_feather_common" value="0" min="0">
     <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_feather_uncommon" value="0" min="0">
     <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_feather_rare" value="0" min="0">
@@ -76,7 +92,10 @@ button.small-btn { padding: 2px 6px; margin: 0 2px; }
     <span style="background-color:#e8d687">金</span>: <input type="number" id="stock_feather_legend" value="0" min="0">
   </div>
   <div class="material-block">
-    <strong>皮</strong>
+    <div class="material-name">
+      <img src="img/leather.png" width="16" height="16">
+      <strong>皮</strong>
+    </div>
     <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_leather_common" value="0" min="0">
     <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_leather_uncommon" value="0" min="0">
     <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_leather_rare" value="0" min="0">
@@ -84,7 +103,10 @@ button.small-btn { padding: 2px 6px; margin: 0 2px; }
     <span style="background-color:#e8d687">金</span>: <input type="number" id="stock_leather_legend" value="0" min="0">
   </div>
   <div class="material-block">
-    <strong>石</strong>
+    <div class="material-name">
+      <img src="img/stone.png" width="16" height="16">
+      <strong>石</strong>
+    </div>
     <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_stone_common" value="0" min="0">
     <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_stone_uncommon" value="0" min="0">
     <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_stone_rare" value="0" min="0">
