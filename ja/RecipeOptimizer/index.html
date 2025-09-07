@@ -9,6 +9,9 @@ body { font-family: sans-serif; padding: 20px; margin:0; box-sizing:border-box; 
 .wrapper { width: 100%; max-width: 100%; overflow-x: auto; }
 .stock-container { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
 .stock-container div { display: flex; align-items: center; gap: 5px; }
+.material-name {
+  display: flex;
+}
 input { width: 60px; }
 table { border: 1px solid #ccc; border-collapse: collapse; width: 100%; max-width: 100%; }
 th, td { border: 1px solid #ccc; padding: 5px; text-align: center; }
@@ -29,11 +32,26 @@ button.small-btn { padding: 2px 6px; margin: 0 2px; }
 
 <h3>所持食材数を入力</h3>
 <div class="stock-container">
-  <div>肉: <input type="number" id="stock_meat" value="" min="0"></div>
-  <div>魚: <input type="number" id="stock_fish" value="" min="0"></div>
-  <div>人参: <input type="number" id="stock_carrot" value="" min="0"></div>
-  <div>塩: <input type="number" id="stock_salt" value="" min="0"></div>
-  <div>水: <input type="number" id="stock_water" value="" min="0"></div>
+  <div class="material-name">
+    <img src="img/meat.png" width="27" height="27">
+    <div>肉: <input type="number" id="stock_meat" value="" min="0"></div>
+  </div>
+  <div class="material-name">
+    <img src="img/fish.png" width="27" height="27">
+    <div>魚: <input type="number" id="stock_fish" value="" min="0"></div>
+  </div>
+  <div class="material-name">
+    <img src="img/carrot.png" width="27" height="27">
+    <div>人参: <input type="number" id="stock_carrot" value="" min="0"></div>
+  </div>
+  <div class="material-name">
+    <img src="img/salt.png" width="27" height="27">
+    <div>塩: <input type="number" id="stock_salt" value="" min="0"></div>
+  </div>
+  <div class="material-name">
+    <img src="img/water.png" width="27" height="27">
+    <div>水: <input type="number" id="stock_water" value="" min="0"></div>
+  </div>
 </div>
 <button id="calculateBtn">計算</button>
 
