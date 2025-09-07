@@ -55,6 +55,8 @@ button.small-btn { padding: 2px 6px; margin: 0 2px; }
 </div>
 <button id="calculateBtn">計算</button>
 
+<span id="calculate_msg"></span>
+
 <h3>料理一覧（消費素材数 + 調理回数）</h3>
 <table id="recipe_table">
 <tr>
@@ -175,6 +177,12 @@ function showRecipeTable(counts={}) {
 
   // 合計作成可能数を表示
   document.getElementById('total_possible').textContent = totalCount;
+
+  if (totalCount > 0) {
+    document.getElementById('calculate_msg').textContent = "計算が完了しました";
+  } else {
+    document.getElementById('calculate_msg').textContent = "作成できる料理はありません";
+  }
 }
 
 async function calculate() {
