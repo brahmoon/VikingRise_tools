@@ -115,6 +115,7 @@ button.small-btn { padding: 2px 6px; margin: 0 2px; }
 </div>
 
 <button id="calculateBtn">計算</button>
+<span id="calculate_msg"></span>
 
 <h3>装備一覧（青基準 → 白換算表示）</h3>
 <table id="recipe_table">
@@ -257,6 +258,12 @@ function showRecipeTable(counts={}) {
   }
 
   document.getElementById('total_possible').textContent = totalCount;
+
+  if (totalCount > 0) {
+    document.getElementById('calculate_msg').textContent = "計算が完了しました";
+  } else {
+    document.getElementById('calculate_msg').textContent = "作成できる料理はありません";
+  }
 }
 
 async function calculate() {
