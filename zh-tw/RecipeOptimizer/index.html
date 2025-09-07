@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>食譜優化工具</title>
+<style>
+body { font-family: sans-serif; padding: 20px; margin:0; box-sizing:border-box; }
+.wrapper { width: 100%; max-width: 100%; overflow-x: auto; }
+.stock-container { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.stock-container div { display: flex; align-items: center; gap: 5px; }
+input { width: 60px; }
+table { border: 1px solid #ccc; border-collapse: collapse; width: 100%; max-width: 100%; }
+th, td { border: 1px solid #ccc; padding: 5px; text-align: center; }
+th { background-color: #f0f0f0; }
+tr.highlight { background-color: #f9f9e5; }
+.count-box { width: 40px; text-align: center; }
+button.small-btn { padding: 2px 6px; margin: 0 2px; }
+@media (max-width: 600px) {
+  .stock-container { flex-direction: column; }
+  input { width: 50px; }
+  table { font-size: 12px; }
+}
+</style>
+</head>
+<body>
+<div class="wrapper">
+<h2>食譜優化工具</h2>
+<span>利用現有食材計算食譜最大製作次數的工具</span>
+
+<h3>輸入您擁有的成分數</h3>
+<div class="stock-container">
+  <div>肉: <input type="number" id="stock_meat" value="" min="0"></div>
+  <div>魚: <input type="number" id="stock_fish" value="" min="0"></div>
+  <div>紅蘿蔔: <input type="number" id="stock_carrot" value="" min="0"></div>
+  <div>鹽: <input type="number" id="stock_salt" value="" min="0"></div>
+  <div>水: <input type="number" id="stock_water" value="" min="0"></div>
+</div>
+<button id="calculateBtn">計算</button>
+
+<h3>菜餚列表（食用的成分數量 + 烹飪數量）</h3>
+<table id="recipe_table">
+<tr>
+  <th>料理</th>
+  <th>肉</th>
+  <th>魚</th>
+  <th>紅蘿蔔</th>
+  <th>鹽</th>
+  <th>水</th>
+  <th>製作次數（計算）</th>
+  <th>實際製作</th>
+</tr>
+</table>
+
+<h3>剩餘的成分</h3>
+<ul id="leftover_list"></ul>
+
+<h3>可製作的總數</h3>
+<div id="total_possible">0</div>
+</div>
+
+<script type="module">
+import GLPK from "./lib/index.js";
+
+const recipes = {
+  炭火烤魚: {肉:0, 魚:30, 紅蘿蔔:5, 鹽:15, 水:0},
+  炭火肉排: {肉:30, 魚:0, 紅蘿蔔:5, 鹽:15, 水:0},
+  炭烤時蔬: {肉:0, 魚:0, 紅蘿蔔:30, 鹽:15, 水:5},
+  風味燻魚: {肉:0, 魚:25, 紅蘿蔔:0, 鹽:15, 水:5},
+  風味燻肉: {肉:25, 魚:0, 紅蘿蔔:0, 鹽:15, 水:5},
+  風味蔬菜: {肉:0, 魚:0, 紅蘿蔔:25, 鹽:15, 水:5},
+  鱈魚鮮湯: {肉:0, 魚:15, 紅蘿蔔:0, 鹽:5, 水:20},
+  鮮燉肉排: {肉:15, 魚:0, 紅蘿蔔:5, 鹽:0, 水:20},
+  香濃蔬菜湯: {肉:0, 魚:0, 紅蘿蔔:15, 鹽:5, 水:20},
+  鹹香排魚: {肉:0, 魚:15, 紅蘿蔔:5, 鹽:5, 水:0},
+  鹹香肉乾: {肉:15, 魚:0, 紅蘿蔔:5, 鹽:5, 水:0},
+  白灼海鮮拼盤: {肉:0, 魚:15, 紅蘿蔔:5, 鹽:0, 水:10},
+  香煎烤肉拼盤: {肉:15, 魚:0, 紅蘿蔔:5, 鹽:10, 水:0},
+  美味蔬菜拼盤: {肉:0, 魚:0, 紅蘿蔔:15, 鹽:5, 水:10},
+  果蔬煎肉拼盤: {肉:0, 魚:5, 紅蘿蔔:15, 鹽:10, 水:0}
+};
+
+let actualCounts = {};
+
+function updateHighlight(element) {
+  const calculatedCount = parseInt(element.closest('tr').children[6].innerHTML);
+  if(element.value >= calculatedCount) {
+    element.closest('tr').classList.remove('highlight');
+  }
+  if(element.value < calculatedCount && !element.closest('tr').classList.contains('highlight')) {
+    element.closest('tr').classList.add('highlight');
+  }
+}
+
+function showRecipeTable(counts={}) {
+  const table = document.getElementById('recipe_table');
+  table.innerHTML = "<tr><th>料理</th><th>肉</th><th>魚</th><th>紅蘿蔔</th><th>鹽</th><th>水</th><th>製作次數（計算）</th><th>實際製作</th></tr>";
+
+  let totalCount = 0;
+
+  for (let r in recipes) {
+    if (!(r in actualCounts)) actualCounts[r] = 0;
+    const tr = document.createElement('tr');
+    const count = counts[r] || 0;
+    totalCount += count;
+
+    // 製作次數為1以上的場合進行標示
+    if (count > 0) {
+      tr.classList.add("highlight");
+    }
+
+    // 實際製作計數部分的DOM建立
+    const tdActual = document.createElement('td');
+    
+    const btnMinus = document.createElement('button');
+    btnMinus.textContent = "-";
+    btnMinus.className = "small-btn";
+    btnMinus.onclick = () => {
+      actualCounts[r] = Math.max(0, actualCounts[r] - 1);
+      input.value = actualCounts[r];
+      updateHighlight(input);
+    };
+    
+    const input = document.createElement('input');
+    input.type = "number";
+    input.value = actualCounts[r];
+    input.className = "count-box";
+    input.min = "0";
+    input.onchange = () => {
+      actualCounts[r] = parseInt(input.value) || 0;
+      updateHighlight(input);
+    };
+    
+    const btnPlus = document.createElement('button');
+    btnPlus.textContent = "+";
+    btnPlus.className = "small-btn";
+    btnPlus.onclick = () => {
+      actualCounts[r]++;
+      input.value = actualCounts[r];
+      updateHighlight(input);
+    };
+    
+    tdActual.appendChild(btnMinus);
+    tdActual.appendChild(input);
+    tdActual.appendChild(btnPlus);
+
+    tr.innerHTML = `<td>${r}</td>
+                    <td>${recipes[r].肉}</td>
+                    <td>${recipes[r].魚}</td>
+                    <td>${recipes[r].紅蘿蔔}</td>
+                    <td>${recipes[r].鹽}</td>
+                    <td>${recipes[r].水}</td>
+                    <td>${count}</td>`;
+    
+    tr.appendChild(tdActual);
+    table.appendChild(tr);
+  }
+
+  // 合計可製作數顯示
+  document.getElementById('total_possible').textContent = totalCount;
+}
+
+async function calculate() {
+  const glpk = await GLPK();
+
+  const stock = {
+    肉: parseInt(document.getElementById('stock_meat').value) || 0,
+    魚: parseInt(document.getElementById('stock_fish').value) || 0,
+    紅蘿蔔: parseInt(document.getElementById('stock_carrot').value) || 0,
+    鹽: parseInt(document.getElementById('stock_salt').value) || 0,
+    水: parseInt(document.getElementById('stock_water').value) || 0
+  };
+
+  const recipeNames = Object.keys(recipes);
+
+  // 1. LP最適化（素材消費少ないレシピ優先）
+  const lp = { 
+    name:'RecipeOptimization', 
+    objective:{ direction: glpk.GLP_MAX, name:'total', vars:[] }, 
+    subjectTo:[]
+  };
+
+  recipeNames.forEach(r => {
+    const total = Object.values(recipes[r]).reduce((a,b)=>a+b,0);
+    lp.objective.vars.push({ name:r, coef:1/total });
+  });
+
+  ['肉','魚','紅蘿蔔','鹽','水'].forEach(mat => {
+    const cons = { name: mat, vars: [], bnds:{ type: glpk.GLP_UP, ub: stock[mat], lb:0 } };
+    recipeNames.forEach(r => cons.vars.push({ name:r, coef: recipes[r][mat] }));
+    lp.subjectTo.push(cons);
+  });
+
+  let result;
+  try { 
+    result = await glpk.solve(lp, { msglev: glpk.GLP_MSG_OFF }); 
+  } 
+  catch(err) { 
+    console.error(err); 
+    alert("計算過程中發生了錯誤。"); 
+    return; 
+  }
+
+  // 2. 整数部分だけ切り捨て
+  const counts = {};
+  recipeNames.forEach(r => counts[r] = Math.floor(result.result.vars[r] || 0));
+
+  // 3. 余り計算
+  let leftover = {...stock};
+  for (let r in counts) {
+    const count = counts[r];
+    for (let mat in recipes[r]) {
+      leftover[mat] -= recipes[r][mat]*count;
+    }
+  }
+
+  // 4. 残余素材で再調理（素材消費少ない順優先）
+  while(true) {
+    let bestRecipe = null;
+    let bestCount = 0;
+    let bestScore = Infinity;
+
+    recipeNames.forEach(r => {
+      let maxCount = Infinity;
+      let score = Object.values(recipes[r]).reduce((a,b)=>a+b,0);
+      for(let mat in recipes[r]) {
+        if(recipes[r][mat]>0) maxCount = Math.min(maxCount, Math.floor(leftover[mat]/recipes[r][mat]));
+      }
+      if(maxCount <=0) return;
+      if(score < bestScore || (score === bestScore && maxCount > bestCount)){
+        bestScore = score;
+        bestCount = maxCount;
+        bestRecipe = r;
+      }
+    });
+
+    if(!bestRecipe) break;
+
+    counts[bestRecipe] += bestCount;
+    for(let mat in recipes[bestRecipe]){
+      leftover[mat] -= recipes[bestRecipe][mat]*bestCount;
+    }
+  }
+
+  // 5. 結果表示
+  showRecipeTable(counts);
+
+  const ul = document.getElementById('leftover_list');
+  ul.innerHTML = '';
+  for (let mat in leftover) {
+    const li = document.createElement('li');
+    li.textContent = `${mat}: ${leftover[mat]}`;
+    ul.appendChild(li);
+  }
+
+  // 計數重置
+  let countBoxes = Array.from(document.getElementsByClassName('count-box'));
+  countBoxes.forEach(input => input.value = 0);
+
+  for (let r in actualCounts) {
+    actualCounts[r] = 0;
+  }
+}
+
+document.getElementById('calculateBtn').addEventListener('click', calculate);
+showRecipeTable();
+</script>
+</body>
+</html>
