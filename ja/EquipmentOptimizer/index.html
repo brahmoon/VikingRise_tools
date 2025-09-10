@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Query Logger Example</title>
+    <script src="https://www.google.com/recaptcha/api.js?render=YOUR_RECAPTCHA_SITE_KEY"></script>
+</head>
+<body>
+    <div id="status">ページを読み込んでいます...</div>
+    
+    <script>
+        // 設定
+        const CONFIG = {
+            RECAPTCHA_SITE_KEY: '6LcrZMQrAAAAABr2uYU5F53pEG46ZnU4LYxXXzWH', // reCAPTCHA v3 のサイトキーに置き換える
+            APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwt9LpWdPJ-h30rTb4iWzKu_n7RUyeQReDzabyLBVZ3GWhCVr-pLUfDOu6_qcF4jYz_/exec', // Apps Script のWeb AppのURLに置き換える
+            ALLOWED_ORIGINS: ['https://brahmoon.github.io'] // あなたのGitHub PagesのURLに置き換える
+        };
+
+        /**
+         * URLクエリパラメータを解析する
+         */
+        function parseQueryParams() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                code: params.get('code'),
+                game_id: params.get('game_id'),
+                char_id: params.get('char_id')
+            };
+        }
+
+        /**
+         * 必要なクエリパラメータが存在するかチェック
+         */
+        function validateParams(params) {
+            return params.code && params.game_id && params.char_id;
+        }
+
+        /**
+         * reCAPTCHAトークンを取得
+         */
+        async function getReCaptchaToken() {
+            try {
+                return await grecaptcha.execute(CONFIG.RECAPTCHA_SITE_KEY, { action: 'log_query' });
+            } catch (error) {
+                console.error('reCAPTCHA token generation failed:', error);
+                throw error;
+            }
+        }
+
+        /**
+         * データをApps Scriptに送信
+         */
+        async function sendToAppsScript(data) {
+            try {
+                const response = await fetch(CONFIG.APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                return result;
+            } catch (error) {
+                console.error('Failed to send data to Apps Script:', error);
+                throw error;
+            }
+        }
+
+        /**
+         * ステータス表示を更新
+         */
+        function updateStatus(message, isError = false) {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = message;
+            statusElement.style.color = isError ? 'red' : 'green';
+        }
+
+        /**
+         * メイン処理
+         */
+        async function main() {
+            try {
+                // URLクエリパラメータを取得
+                const params = parseQueryParams();
+                
+                // パラメータが存在しない場合は処理を終了
+                if (!validateParams(params)) {
+                    updateStatus('必要なクエリパラメータ（code, game_id, char_id）が見つかりません。');
+                    return;
+                }
+
+                updateStatus('データを送信しています...');
+
+                // reCAPTCHAトークンを取得
+                const recaptchaToken = await getReCaptchaToken();
+
+                // 送信データを準備
+                const dataToSend = {
+                    code: params.code,
+                    game_id: params.game_id,
+                    char_id: params.char_id,
+                    origin: window.location.origin,
+                    referer: window.location.href,
+                    recaptchaToken: recaptchaToken
+                };
+
+                // Apps Scriptに送信
+                const result = await sendToAppsScript(dataToSend);
+
+                if (result.success) {
+                    updateStatus('データが正常に保存されました。');
+                } else {
+                    updateStatus(`エラー: ${result.message || '不明なエラーが発生しました。'}`, true);
+                }
+
+            } catch (error) {
+                console.error('Main process error:', error);
+                updateStatus('処理中にエラーが発生しました。', true);
+            }
+        }
+
+        // reCAPTCHAが読み込まれた後にメイン処理を実行
+        grecaptcha.ready(function() {
+            main();
+        });
+    </script>
+</body>
+</html>
