@@ -12,9 +12,9 @@
     <script>
         // 設定
         const CONFIG = {
-            RECAPTCHA_SITE_KEY: '6LcrZMQrAAAAABr2uYU5F53pEG46ZnU4LYxXXzWH', // reCAPTCHA v3 のサイトキーに置き換える
-            APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyDG7uY1Lur7Ge642IIP2wdifIzCTT_R4F26Hj7ptkW_rVqSlu230QrK3KdgwMnLtdZ/exec', // Apps Script のWeb AppのURLに置き換える
-            ALLOWED_ORIGINS: ['https://brahmoon.github.io'] // あなたのGitHub PagesのURLに置き換える
+            RECAPTCHA_SITE_KEY: '6LcrZMQrAAAAABr2uYU5F53pEG46ZnU4LYxXXzWH',
+            APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyDG7uY1Lur7Ge642IIP2wdifIzCTT_R4F26Hj7ptkW_rVqSlu230QrK3KdgwMnLtdZ/exec',
+            ALLOWED_ORIGINS: ['https://brahmoon.github.io']
         };
 
         /**
@@ -49,7 +49,87 @@
         }
 
         /**
-         * データをApps Scriptに送信
+         * フォームを使用してデータをApps Scriptに送信（CORS回避）
+         */
+        async function sendToAppsScriptViaForm(data) {
+            return new Promise((resolve, reject) => {
+                try {
+                    // 非表示のフォームを作成
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = CONFIG.APPS_SCRIPT_URL;
+                    form.target = 'response_iframe';
+                    form.style.display = 'none';
+
+                    // データをフォームフィールドとして追加
+                    for (const [key, value] of Object.entries(data)) {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = key;
+                        input.value = value;
+                        form.appendChild(input);
+                    }
+
+                    // レスポンス受信用のiframeを作成
+                    const iframe = document.createElement('iframe');
+                    iframe.name = 'response_iframe';
+                    iframe.style.display = 'none';
+                    
+                    // iframeのロード完了時の処理
+                    iframe.onload = function() {
+                        try {
+                            setTimeout(() => {
+                                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                                const responseText = iframeDoc.body.textContent || iframeDoc.body.innerText;
+                                
+                                // JSONレスポンスをパース
+                                let result;
+                                try {
+                                    result = JSON.parse(responseText);
+                                } catch (e) {
+                                    // HTMLレスポンスの場合、JSONを抽出
+                                    const jsonMatch = responseText.match(/{"success":[^}]+}/);
+                                    if (jsonMatch) {
+                                        result = JSON.parse(jsonMatch[0]);
+                                    } else {
+                                        result = { success: false, message: 'Invalid response format' };
+                                    }
+                                }
+                                
+                                // クリーンアップ
+                                document.body.removeChild(form);
+                                document.body.removeChild(iframe);
+                                
+                                resolve(result);
+                            }, 1000);
+                        } catch (error) {
+                            console.error('Error processing iframe response:', error);
+                            document.body.removeChild(form);
+                            document.body.removeChild(iframe);
+                            reject(error);
+                        }
+                    };
+
+                    iframe.onerror = function() {
+                        document.body.removeChild(form);
+                        document.body.removeChild(iframe);
+                        reject(new Error('Failed to load response iframe'));
+                    };
+
+                    // DOM に追加してフォームを送信
+                    document.body.appendChild(form);
+                    document.body.appendChild(iframe);
+                    form.submit();
+
+                } catch (error) {
+                    console.error('Error in sendToAppsScriptViaForm:', error);
+                    reject(error);
+                }
+            });
+        }
+
+        /**
+         * データをApps Scriptに送信（fetch API使用、CORS制限あり）
          */
         async function sendToAppsScript(data) {
             try {
@@ -68,8 +148,9 @@
                 const result = await response.json();
                 return result;
             } catch (error) {
-                console.error('Failed to send data to Apps Script:', error);
-                throw error;
+                console.error('Fetch failed, trying form submission:', error);
+                // fetchが失敗した場合はフォーム送信を試す
+                return await sendToAppsScriptViaForm(data);
             }
         }
 
@@ -114,10 +195,10 @@
                 // Apps Scriptに送信
                 const result = await sendToAppsScript(dataToSend);
 
-                if (result.success) {
+                if (result && result.success) {
                     updateStatus('データが正常に保存されました。');
                 } else {
-                    updateStatus(`エラー: ${result.message || '不明なエラーが発生しました。'}`, true);
+                    updateStatus(`エラー: ${result?.message || '不明なエラーが発生しました。'}`, true);
                 }
 
             } catch (error) {
