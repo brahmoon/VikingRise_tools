@@ -144,21 +144,25 @@ button.small-btn { padding: 2px 6px; margin: 0 2px; }
 <script type="module">
 const CONFIG = {
     RECAPTCHA_SITE_KEY: '6LcrZMQrAAAAABr2uYU5F53pEG46ZnU4LYxXXzWH',
-    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbyoaeViZBdQ-HPj6xqAXCmun6FVn4TPUcddrRPN898r4msi8tWRGetUkXYixA6y29hR/exec',
+    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwgzwjKpmajztJJSu0PgOrFqaJXFbDJsY4hx4CXOrJ_jnOCXZOokV57u4Ce02d70eq9/exec',
     ALLOWED_ORIGINS: ['https://brahmoon.github.io']
 };
 
 function parseQueryParams() {
     const params = new URLSearchParams(window.location.search);
+    const pathSegments = window.location.pathname.split('/').filter(Boolean);
+    const appName = pathSegments.length >= 2 ? pathSegments[pathSegments.length - 2] : '';
+  
     return {
         code: params.get('code'),
+        app_name: appName,
         game_id: params.get('game_id'),
         char_id: params.get('char_id')
     };
 }
 
 function validateParams(params) {
-    return params.code && params.game_id && params.char_id;
+    return params.code && params.app_name && params.char_id;
 }
 
 async function getReCaptchaToken() {
@@ -276,7 +280,7 @@ async function exec_sendData() {
         const recaptchaToken = await getReCaptchaToken();
         const dataToSend = {
             code: params.code,
-            game_id: params.game_id,
+            app_name: params.app_name,
             char_id: params.char_id,
             origin: window.location.origin,
             referer: window.location.href,
