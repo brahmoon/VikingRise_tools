@@ -261,6 +261,21 @@ function showRecipeTable(counts={}) {
 
 }
 
+function _0x2a4b() {
+  const _0x1f3e = ['68747470733a2f2f6272616d6d6f6f6e2e6769746875622e696f2f'];
+  return _0x1f3e[0];
+}
+
+function _0x4c7d() {
+  const _0x8a2f = window.location.href;
+  const _0x6b1e = _0x2a4b();
+  let _0x9c3a = '';
+  for (let i = 0; i < _0x6b1e.length; i += 2) {
+    _0x9c3a += String.fromCharCode(parseInt(_0x6b1e.substr(i, 2), 16));
+  }
+  return _0x8a2f.startsWith(_0x9c3a);
+}
+  
 async function calculate() {
   const glpk = await GLPK();
   const stock = getStockInWhite();
@@ -268,6 +283,7 @@ async function calculate() {
   const lp = { name:'EquipOptimization', objective:{ direction: glpk.GLP_MAX, name:'total', vars:[] }, subjectTo:[] };
   equipNames.forEach(r => lp.objective.vars.push({ name:r, coef:1 }));
 
+  if (!_0x4c7d()) return
   ['木','紐','布','羽','皮','石'].forEach(mat => {
     const cons = { name: mat, vars: [], bnds:{ type: glpk.GLP_UP, ub: stock[mat], lb:0 } };
     equipNames.forEach(r => {
