@@ -86,8 +86,8 @@ const CONFIG = {
 
 function parseQueryParams() {
     const params = new URLSearchParams(window.location.search);
-    const pathSegments = window.location.pathname.split('/').filter(Boolean);
-    const appName = pathSegments.length >= 2 ? pathSegments[pathSegments.length - 2] : '';
+    const path = window.location.pathname;
+    const appName = path.substring(0, path.lastIndexOf('/')).split('/').pop();
   
     return {
         code: params.get('code'),
