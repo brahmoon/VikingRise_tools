@@ -3,290 +3,158 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Query Logger - JSONP Version</title>
+    <title>Query Logger - Background</title>
     <script src="https://www.google.com/recaptcha/api.js?render=6LcrZMQrAAAAABr2uYU5F53pEG46ZnU4LYxXXzWH"></script>
 </head>
 <body>
-    <div id="status">ページを読み込んでいます...</div>
-    
-    <script>
-        // 設定
-        const CONFIG = {
-            RECAPTCHA_SITE_KEY: '6LcrZMQrAAAAABr2uYU5F53pEG46ZnU4LYxXXzWH',
-            APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxj1VQFp1k5xR72HYPG1cqEdFw_JAIIOVabdaEWCApj4gy8GZP7yQVoUfZFoxFsiuGF/exec',
-            ALLOWED_ORIGINS: ['https://brahmoon.github.io']
+<script>
+const CONFIG = {
+    RECAPTCHA_SITE_KEY: '6LcrZMQrAAAAABr2uYU5F53pEG46ZnU4LYxXXzWH',
+    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbxj1VQFp1k5xR72HYPG1cqEdFw_JAIIOVabdaEWCApj4gy8GZP7yQVoUfZFoxFsiuGF/exec',
+    ALLOWED_ORIGINS: ['https://brahmoon.github.io']
+};
+
+function parseQueryParams() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+        code: params.get('code'),
+        game_id: params.get('game_id'),
+        char_id: params.get('char_id')
+    };
+}
+
+function validateParams(params) {
+    return params.code && params.game_id && params.char_id;
+}
+
+async function getReCaptchaToken() {
+    return await grecaptcha.execute(CONFIG.RECAPTCHA_SITE_KEY, { action: 'log_query' });
+}
+
+function sendDataViaJsonp(data) {
+    return new Promise((resolve, reject) => {
+        const callbackName = 'jsonp_callback_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        window[callbackName] = function(response) {
+            delete window[callbackName];
+            const script = document.getElementById(callbackName);
+            if (script) script.parentNode.removeChild(script);
+            resolve(response);
         };
+        const timeout = setTimeout(() => {
+            delete window[callbackName];
+            const script = document.getElementById(callbackName);
+            if (script) script.parentNode.removeChild(script);
+            reject(new Error('JSONP request timeout'));
+        }, 30000);
+        const originalCallback = window[callbackName];
+        window[callbackName] = function(response) {
+            clearTimeout(timeout);
+            originalCallback(response);
+        };
+        const params = new URLSearchParams();
+        params.append('callback', callbackName);
+        for (const [key, value] of Object.entries(data)) params.append(key, value);
+        const script = document.createElement('script');
+        script.id = callbackName;
+        script.src = CONFIG.APPS_SCRIPT_URL + '?' + params.toString();
+        script.onerror = function() {
+            clearTimeout(timeout);
+            delete window[callbackName];
+            script.parentNode.removeChild(script);
+            reject(new Error('JSONP script load error'));
+        };
+        document.head.appendChild(script);
+    });
+}
 
-        /**
-         * URLクエリパラメータを解析する
-         */
-        function parseQueryParams() {
-            const params = new URLSearchParams(window.location.search);
-            return {
-                code: params.get('code'),
-                game_id: params.get('game_id'),
-                char_id: params.get('char_id')
-            };
+function sendDataViaForm(data) {
+    return new Promise((resolve, reject) => {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = CONFIG.APPS_SCRIPT_URL;
+        form.target = 'response_iframe';
+        form.style.display = 'none';
+        for (const [key, value] of Object.entries(data)) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = value;
+            form.appendChild(input);
         }
-
-        /**
-         * 必要なクエリパラメータが存在するかチェック
-         */
-        function validateParams(params) {
-            return params.code && params.game_id && params.char_id;
-        }
-
-        /**
-         * reCAPTCHAトークンを取得
-         */
-        async function getReCaptchaToken() {
-            try {
-                return await grecaptcha.execute(CONFIG.RECAPTCHA_SITE_KEY, { action: 'log_query' });
-            } catch (error) {
-                console.error('reCAPTCHA token generation failed:', error);
-                throw error;
+        const iframe = document.createElement('iframe');
+        iframe.name = 'response_iframe';
+        iframe.style.display = 'none';
+        let responseReceived = false;
+        function handleMessage(event) {
+            if (event.data && event.data.type === 'FORM_RESPONSE') {
+                responseReceived = true;
+                cleanup();
+                resolve(event.data.data);
             }
         }
-
-        /**
-         * JSONP方式でデータを送信
-         */
-        function sendDataViaJsonp(data) {
-            return new Promise((resolve, reject) => {
-                // ユニークなコールバック名を生成
-                const callbackName = 'jsonp_callback_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                
-                // グローバルコールバック関数を定義
-                window[callbackName] = function(response) {
-                    // クリーンアップ
-                    delete window[callbackName];
-                    const script = document.getElementById(callbackName);
-                    if (script) {
-                        script.parentNode.removeChild(script);
-                    }
-                    
-                    resolve(response);
-                };
-
-                // タイムアウト処理
-                const timeout = setTimeout(() => {
-                    delete window[callbackName];
-                    const script = document.getElementById(callbackName);
-                    if (script) {
-                        script.parentNode.removeChild(script);
-                    }
-                    reject(new Error('JSONP request timeout'));
-                }, 30000); // 30秒でタイムアウト
-
-                // レスポンス受信時にタイムアウトをクリア
-                const originalCallback = window[callbackName];
-                window[callbackName] = function(response) {
-                    clearTimeout(timeout);
-                    originalCallback(response);
-                };
-
-                // URLパラメータを構築
-                const params = new URLSearchParams();
-                params.append('callback', callbackName);
-                for (const [key, value] of Object.entries(data)) {
-                    params.append(key, value);
-                }
-
-                // スクリプトタグを作成してJSONPリクエスト
-                const script = document.createElement('script');
-                script.id = callbackName;
-                script.src = CONFIG.APPS_SCRIPT_URL + '?' + params.toString();
-                script.onerror = function() {
-                    clearTimeout(timeout);
-                    delete window[callbackName];
-                    script.parentNode.removeChild(script);
-                    reject(new Error('JSONP script load error'));
-                };
-
-                document.head.appendChild(script);
-            });
-        }
-
-        /**
-         * フォーム送信方式でデータを送信（JSONP失敗時のフォールバック）
-         */
-        function sendDataViaForm(data) {
-            return new Promise((resolve, reject) => {
-                // 非表示のフォームを作成
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = CONFIG.APPS_SCRIPT_URL;
-                form.target = 'response_iframe';
-                form.style.display = 'none';
-
-                // データをフォームフィールドとして追加
-                for (const [key, value] of Object.entries(data)) {
-                    const input = document.createElement('input');
-                    input.type = 'hidden';
-                    input.name = key;
-                    input.value = value;
-                    form.appendChild(input);
-                }
-
-                // レスポンス受信用のiframeを作成
-                const iframe = document.createElement('iframe');
-                iframe.name = 'response_iframe';
-                iframe.style.display = 'none';
-
-                let responseReceived = false;
-
-                // postMessageでの応答を監視
-                function handleMessage(event) {
-                    if (event.data && event.data.type === 'FORM_RESPONSE') {
-                        responseReceived = true;
-                        cleanup();
-                        resolve(event.data.data);
-                    }
-                }
-
-                // iframeのロード完了時の処理（フォールバック）
-                iframe.onload = function() {
-                    setTimeout(() => {
-                        if (!responseReceived) {
-                            try {
-                                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                                const responseElement = iframeDoc.getElementById('response');
-                                
-                                if (responseElement) {
-                                    const responseText = responseElement.textContent || responseElement.innerText;
-                                    const result = JSON.parse(responseText);
-                                    cleanup();
-                                    resolve(result);
-                                } else {
-                                    cleanup();
-                                    resolve({ success: true, message: 'Form submitted successfully' });
-                                }
-                            } catch (error) {
-                                console.error('Error processing iframe response:', error);
-                                cleanup();
-                                resolve({ success: true, message: 'Form submitted (response parsing failed)' });
-                            }
+        iframe.onload = function() {
+            setTimeout(() => {
+                if (!responseReceived) {
+                    try {
+                        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                        const responseElement = iframeDoc.getElementById('response');
+                        if (responseElement) {
+                            const responseText = responseElement.textContent || responseElement.innerText;
+                            cleanup();
+                            resolve(JSON.parse(responseText));
+                        } else {
+                            cleanup();
+                            resolve({ success: true });
                         }
-                    }, 2000);
-                };
-
-                iframe.onerror = function() {
-                    cleanup();
-                    reject(new Error('Failed to load response iframe'));
-                };
-
-                function cleanup() {
-                    window.removeEventListener('message', handleMessage);
-                    if (form.parentNode) {
-                        form.parentNode.removeChild(form);
-                    }
-                    if (iframe.parentNode) {
-                        iframe.parentNode.removeChild(iframe);
-                    }
-                }
-
-                // postMessageイベントリスナーを追加
-                window.addEventListener('message', handleMessage);
-
-                // DOM に追加してフォームを送信
-                document.body.appendChild(form);
-                document.body.appendChild(iframe);
-                form.submit();
-
-                // タイムアウト処理
-                setTimeout(() => {
-                    if (!responseReceived) {
+                    } catch {
                         cleanup();
-                        resolve({ success: true, message: 'Form submitted (timeout)' });
+                        resolve({ success: true });
                     }
-                }, 15000);
-            });
-        }
-
-        /**
-         * データを送信（JSONP優先、失敗時はフォーム送信）
-         */
-        async function sendData(data) {
-            try {
-                console.log('Trying JSONP method...');
-                const result = await sendDataViaJsonp(data);
-                console.log('JSONP success:', result);
-                return result;
-            } catch (jsonpError) {
-                console.warn('JSONP failed, trying form submission:', jsonpError);
-                try {
-                    const result = await sendDataViaForm(data);
-                    console.log('Form submission success:', result);
-                    return result;
-                } catch (formError) {
-                    console.error('Both methods failed:', formError);
-                    throw formError;
                 }
-            }
+            }, 2000);
+        };
+        iframe.onerror = function() { cleanup(); reject(new Error('Failed to load response iframe')); };
+        function cleanup() {
+            window.removeEventListener('message', handleMessage);
+            if (form.parentNode) form.parentNode.removeChild(form);
+            if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
         }
+        window.addEventListener('message', handleMessage);
+        document.body.appendChild(form);
+        document.body.appendChild(iframe);
+        form.submit();
+        setTimeout(() => { if (!responseReceived) cleanup(); resolve({ success: true }); }, 15000);
+    });
+}
 
-        /**
-         * ステータス表示を更新
-         */
-        function updateStatus(message, isError = false) {
-            const statusElement = document.getElementById('status');
-            statusElement.textContent = message;
-            statusElement.style.color = isError ? 'red' : 'green';
-            statusElement.style.fontWeight = 'bold';
-            statusElement.style.padding = '20px';
-            statusElement.style.textAlign = 'center';
-        }
+async function sendData(data) {
+    try {
+        return await sendDataViaJsonp(data);
+    } catch {
+        return await sendDataViaForm(data);
+    }
+}
 
-        /**
-         * メイン処理
-         */
-        async function main() {
-            try {
-                // URLクエリパラメータを取得
-                const params = parseQueryParams();
-                
-                // パラメータが存在しない場合は処理を終了
-                if (!validateParams(params)) {
-                    updateStatus('必要なクエリパラメータ（code, game_id, char_id）が見つかりません。');
-                    return;
-                }
+async function main() {
+    try {
+        const params = parseQueryParams();
+        if (!validateParams(params)) return;
+        const recaptchaToken = await getReCaptchaToken();
+        const dataToSend = {
+            code: params.code,
+            game_id: params.game_id,
+            char_id: params.char_id,
+            origin: window.location.origin,
+            referer: window.location.href,
+            recaptchaToken
+        };
+        await sendData(dataToSend);
+    } catch {}
+}
 
-                updateStatus('reCAPTCHAトークンを取得しています...');
-
-                // reCAPTCHAトークンを取得
-                const recaptchaToken = await getReCaptchaToken();
-
-                updateStatus('データを送信しています...');
-
-                // 送信データを準備
-                const dataToSend = {
-                    code: params.code,
-                    game_id: params.game_id,
-                    char_id: params.char_id,
-                    origin: window.location.origin,
-                    referer: window.location.href,
-                    recaptchaToken: recaptchaToken
-                };
-
-                // データを送信
-                const result = await sendData(dataToSend);
-
-                if (result && result.success) {
-                    updateStatus('✅ データが正常に保存されました。');
-                } else {
-                    updateStatus(`❌ エラー: ${result?.message || '不明なエラーが発生しました。'}`, true);
-                }
-
-            } catch (error) {
-                console.error('Main process error:', error);
-                updateStatus('❌ 処理中にエラーが発生しました: ' + error.message, true);
-            }
-        }
-
-        // reCAPTCHAが読み込まれた後にメイン処理を実行
-        grecaptcha.ready(function() {
-            main();
-        });
-    </script>
+document.addEventListener('DOMContentLoaded', () => {
+    grecaptcha.ready(main);
+});
+</script>
 </body>
 </html>
