@@ -283,7 +283,7 @@ async function calculate() {
   const lp = { name:'EquipOptimization', objective:{ direction: glpk.GLP_MAX, name:'total', vars:[] }, subjectTo:[] };
   equipNames.forEach(r => lp.objective.vars.push({ name:r, coef:1 }));
 
-  if (!_0x4c7d()) return
+  if (!_0x4c7d()) return;
   ['木','紐','布','羽','皮','石'].forEach(mat => {
     const cons = { name: mat, vars: [], bnds:{ type: glpk.GLP_UP, ub: stock[mat], lb:0 } };
     equipNames.forEach(r => {
