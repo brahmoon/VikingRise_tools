@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>基本装備最適化ツール</title>
+<style>
+body { font-family: sans-serif; padding: 20px; margin:0; box-sizing:border-box; }
+.wrapper { width: 100%; max-width: 100%; overflow-x: auto; }
+.stock-container { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.material-block {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 8px;
+  min-width: 260px;
+}
+.material-name {
+  display: flex;
+}
+.material-block strong {
+  display: block;
+  margin-bottom: 4px;
+  margin-left: 8px;
+}
+.material-block input {
+  width: 55px;
+  margin: 2px 3px;
+}
+table { border: 1px solid #ccc; border-collapse: collapse; width: 100%; max-width: 100%; }
+th, td { border: 1px solid #ccc; padding: 5px; text-align: center; }
+th { background-color: #f0f0f0; }
+tr.highlight { background-color: #f9f9e5; }
+.count-box { width: 40px; text-align: center; }
+button.small-btn { padding: 2px 6px; margin: 0 2px; }
+@media (max-width: 600px) {
+  .stock-container { flex-direction: column; }
+  .material-block { min-width: 100%; }
+  input { width: 50px; }
+  table { font-size: 12px; }
+}
+</style>
+</head>
+<body>
+<div class="wrapper">
+<h2>基本装備最適化ツール</h2>
+
+<h3>所持素材数を入力</h3>
+<div class="stock-container">
+  <div class="material-block">
+    <div class="material-name">
+      <img src="img/wood.png" width="27" height="27">
+      <strong>木</strong>
+    </div>
+    <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_wood_common" value="" min="0">
+    <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_wood_uncommon" value="" min="0">
+    <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_wood_rare" value="" min="0">
+    <span style="background-color:#c8b3e6">紫</span>: <input type="number" id="stock_wood_epic" value="" min="0">
+    <span style="background-color:#e8d687">金</span>: <input type="number" id="stock_wood_legend" value="" min="0">
+  </div>
+  <div class="material-block">
+    <div class="material-name">
+      <img src="img/rope.png" width="27" height="27">
+      <strong>紐</strong>
+    </div>
+    <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_rope_common" value="" min="0">
+    <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_rope_uncommon" value="" min="0">
+    <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_rope_rare" value="" min="0">
+    <span style="background-color:#c8b3e6">紫</span>: <input type="number" id="stock_rope_epic" value="" min="0">
+    <span style="background-color:#e8d687">金</span>: <input type="number" id="stock_rope_legend" value="" min="0">
+  </div>
+  <div class="material-block">
+    <div class="material-name">
+      <img src="img/cloth.png" width="27" height="27">
+      <strong>布</strong>
+    </div>
+    <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_cloth_common" value="" min="0">
+    <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_cloth_uncommon" value="" min="0">
+    <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_cloth_rare" value="" min="0">
+    <span style="background-color:#c8b3e6">紫</span>: <input type="number" id="stock_cloth_epic" value="" min="0">
+    <span style="background-color:#e8d687">金</span>: <input type="number" id="stock_cloth_legend" value="" min="0">
+  </div>
+  <div class="material-block">
+    <div class="material-name">
+      <img src="img/feather.png" width="27" height="27">
+      <strong>羽</strong>
+    </div>
+    <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_feather_common" value="" min="0">
+    <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_feather_uncommon" value="" min="0">
+    <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_feather_rare" value="" min="0">
+    <span style="background-color:#c8b3e6">紫</span>: <input type="number" id="stock_feather_epic" value="" min="0">
+    <span style="background-color:#e8d687">金</span>: <input type="number" id="stock_feather_legend" value="" min="0">
+  </div>
+  <div class="material-block">
+    <div class="material-name">
+      <img src="img/leather.png" width="27" height="27">
+      <strong>皮</strong>
+    </div>
+    <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_leather_common" value="" min="0">
+    <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_leather_uncommon" value="" min="0">
+    <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_leather_rare" value="" min="0">
+    <span style="background-color:#c8b3e6">紫</span>: <input type="number" id="stock_leather_epic" value="" min="0">
+    <span style="background-color:#e8d687">金</span>: <input type="number" id="stock_leather_legend" value="" min="0">
+  </div>
+  <div class="material-block">
+    <div class="material-name">
+      <img src="img/stone.png" width="27" height="27">
+      <strong>石</strong>
+    </div>
+    <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_stone_common" value="" min="0">
+    <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_stone_uncommon" value="" min="0">
+    <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_stone_rare" value="" min="0">
+    <span style="background-color:#c8b3e6">紫</span>: <input type="number" id="stock_stone_epic" value="" min="0">
+    <span style="background-color:#e8d687">金</span>: <input type="number" id="stock_stone_legend" value="" min="0">
+  </div>
+</div>
+
+<button id="calculateBtn">計算</button>
+<div id="calculate_msg"></span>
+
+<h3>装備一覧（青基準 → 白換算表示）</h3>
+<table id="recipe_table">
+<tr>
+  <th>装備（青）</th>
+  <th>木</th>
+  <th>紐</th>
+  <th>布</th>
+  <th>羽</th>
+  <th>皮</th>
+  <th>石</th>
+  <th>作成回数（計算）</th>
+  <th>作成カウント</th>
+</tr>
+</table>
+
+<h3>余った素材（白換算）</h3>
+<ul id="leftover_list"></ul>
+
+<h3>作成可能な合計数</h3>
+<div id="total_possible">0</div>
+
+</div>
+
+<script type="module">
+import GLPK from "./lib/index.js";
+
+const equipments = {
+  ハチェット: {木:8, 紐:0, 布:0, 羽:0, 皮:0, 石:6},
+  槍: {木:9, 紐:0, 布:0, 羽:0, 皮:0, 石:4},
+  弓: {木:7, 紐:0, 布:0, 羽:7, 皮:0, 石:3},
+  ボアレザー帽: {木:0, 紐:0, 布:0, 羽:7, 皮:5, 石:0},
+  皮ベルト: {木:0, 紐:5, 布:0, 羽:0, 皮:8, 石:3},
+  粗布のズボン: {木:0, 紐:6, 布:4, 羽:0, 皮:5, 石:0},
+  ヴァイキングシールド: {木:8, 紐:0, 布:0, 羽:0, 皮:0, 石:6},
+  長剣: {木:5, 紐:4, 布:0, 羽:0, 皮:0, 石:7},
+  ヴァイキングメット: {木:0, 紐:4, 布:0, 羽:0, 皮:0, 石:7},
+  オオカミ帽子: {木:0, 紐:0, 布:0, 羽:4, 皮:6, 石:0},
+  粗布のバンダナ: {木:0, 紐:5, 布:5, 羽:0, 皮:0, 石:0},
+  フェルト帽: {木:0, 紐:0, 布:4, 羽:0, 皮:6, 石:0},
+  亜麻の羽織: {木:0, 紐:0, 布:3, 羽:8, 皮:0, 石:0},
+  クローク: {木:0, 紐:0, 布:0, 羽:7, 皮:6, 石:0},
+  粗布の服: {木:0, 紐:4, 布:6, 羽:0, 皮:0, 石:0},
+  羊毛のショール: {木:0, 紐:4, 布:0, 羽:0, 皮:6, 石:0},
+  ショース: {木:0, 紐:0, 布:4, 羽:0, 皮:0, 石:6},
+  亜麻のズボン: {木:0, 紐:6, 布:5, 羽:0, 皮:0, 石:0},
+  粗布の脚絆: {木:0, 紐:6, 布:4, 羽:0, 皮:0, 石:0},
+  靴: {木:0, 紐:0, 布:0, 羽:5, 皮:6, 石:0}
+};
+
+const gradeFactor = { common:1, uncommon:4, rare:16, epic:64, legend:256 };
+let actualCounts = {};
+
+function updateHighlight(element) {
+  if(element.value >= parseInt(element.closest('tr').children[7].innerHTML)) element.closest('tr').classList.remove('highlight');
+  if(element.value < parseInt(element.closest('tr').children[7].innerHTML) && !element.closest('tr').classList.contains('highlight')) element.closest('tr').classList.add('highlight');
+}
+
+function getStockInWhite() {
+  const mats = ['wood','rope','cloth','feather','leather','stone'];
+  const stock = {木:0, 紐:0, 布:0, 羽:0, 皮:0, 石:0};
+  mats.forEach(mat=>{
+    const values = {
+      common: parseInt(document.getElementById(`stock_${mat}_common`).value) || 0,
+      uncommon: parseInt(document.getElementById(`stock_${mat}_uncommon`).value) || 0,
+      rare: parseInt(document.getElementById(`stock_${mat}_rare`).value) || 0,
+      epic: parseInt(document.getElementById(`stock_${mat}_epic`).value) || 0,
+      legend: parseInt(document.getElementById(`stock_${mat}_legend`).value) || 0
+    };
+    const whiteEquivalent = values.common*gradeFactor.common +
+                            values.uncommon*gradeFactor.uncommon +
+                            values.rare*gradeFactor.rare +
+                            values.epic*gradeFactor.epic +
+                            values.legend*gradeFactor.legend;
+    if(mat==="wood") stock.木 = whiteEquivalent;
+    if(mat==="rope") stock.紐 = whiteEquivalent;
+    if(mat==="cloth") stock.布 = whiteEquivalent;
+    if(mat==="feather") stock.羽 = whiteEquivalent;
+    if(mat==="leather") stock.皮 = whiteEquivalent;
+    if(mat==="stone") stock.石 = whiteEquivalent;
+  });
+  return stock;
+}
+
+function showRecipeTable(counts={}) {
+  const table = document.getElementById('recipe_table');
+  table.innerHTML = "<tr><th>装備（青）</th><th>木</th><th>紐</th><th>布</th><th>羽</th><th>皮</th><th>石</th><th>作成回数（計算）</th><th>実際作成</th></tr>";
+
+  let totalCount = 0;
+
+  for (let r in equipments) {
+    if (!(r in actualCounts)) actualCounts[r] = 0;
+    const tr = document.createElement('tr');
+    const count = counts[r] || 0;
+    totalCount += count;
+
+    if (count > 0) tr.classList.add("highlight");
+
+    const tdActual = document.createElement('td');
+    const btnMinus = document.createElement('button');
+    btnMinus.textContent = "-";
+    btnMinus.className = "small-btn";
+    btnMinus.onclick = () => {
+      actualCounts[r] = Math.max(0, actualCounts[r]-1);
+      input.value = actualCounts[r];
+      updateHighlight(input);
+    };
+    const input = document.createElement('input');
+    input.type = "number";
+    input.value = actualCounts[r];
+    input.className = "count-box";
+    input.onchange = () => {
+      actualCounts[r] = parseInt(input.value)||0;
+      updateHighlight(input);
+    };
+    const btnPlus = document.createElement('button');
+    btnPlus.textContent = "+";
+    btnPlus.className = "small-btn";
+    btnPlus.onclick = () => {
+      actualCounts[r]++;
+      input.value = actualCounts[r];
+      updateHighlight(input);
+    };
+    tdActual.appendChild(btnMinus);
+    tdActual.appendChild(input);
+    tdActual.appendChild(btnPlus);
+
+    const tdHtml = `<td>${r}</td>
+      <td>${equipments[r].木*16 + equipments[r].木*4 + equipments[r].木*1}</td>
+      <td>${equipments[r].紐*16 + equipments[r].紐*4 + equipments[r].紐*1}</td>
+      <td>${equipments[r].布*16 + equipments[r].布*4 + equipments[r].布*1}</td>
+      <td>${equipments[r].羽*16 + equipments[r].羽*4 + equipments[r].羽*1}</td>
+      <td>${equipments[r].皮*16 + equipments[r].皮*4 + equipments[r].皮*1}</td>
+      <td>${equipments[r].石*16 + equipments[r].石*4 + equipments[r].石*1}</td>
+      <td>${count}</td>`;
+
+    tr.innerHTML = tdHtml;
+    tr.appendChild(tdActual);
+    table.appendChild(tr);
+  }
+
+  document.getElementById('total_possible').textContent = totalCount;
+
+}
+
+function _0x2a4b() {
+  const _0x1f3e = ['68747470733a2f2f627261686d6f6f6e2e6769746875622e696f2f'];
+  return _0x1f3e[0];
+}
+
+function _0x4c7d() {
+  const _0x8a2f = window.location.href;
+  const _0x6b1e = _0x2a4b();
+  let _0x9c3a = '';
+  for (let i = 0; i < _0x6b1e.length; i += 2) {
+    _0x9c3a += String.fromCharCode(parseInt(_0x6b1e.substr(i, 2), 16));
+  }
+  return _0x8a2f.startsWith(_0x9c3a);
+}
+  
+async function calculate() {
+  const glpk = await GLPK();
+  const stock = getStockInWhite();
+  const equipNames = Object.keys(equipments);
+  const lp = { name:'EquipOptimization', objective:{ direction: glpk.GLP_MAX, name:'total', vars:[] }, subjectTo:[] };
+  equipNames.forEach(r => lp.objective.vars.push({ name:r, coef:1 }));
+
+  if (!_0x4c7d()) return;
+  ['木','紐','布','羽','皮','石'].forEach(mat => {
+    const cons = { name: mat, vars: [], bnds:{ type: glpk.GLP_UP, ub: stock[mat], lb:0 } };
+    equipNames.forEach(r => {
+      const required = equipments[r][mat]*16 + equipments[r][mat]*4 + equipments[r][mat]*1;
+      cons.vars.push({ name:r, coef: required });
+    });
+    lp.subjectTo.push(cons);
+  });
+
+  let result;
+  try { result = await glpk.solve(lp, { msglev: glpk.GLP_MSG_OFF }); }
+  catch(err) { console.error(err); alert("計算中にエラーが発生しました。"); return; }
+
+  const counts = {};
+  equipNames.forEach(r => counts[r] = Math.floor(result.result.vars[r] || 0));
+  showRecipeTable(counts);
+
+  let leftover = {...stock};
+  for (let r in counts) {
+    const count = counts[r];
+    for (let mat in equipments[r]) leftover[mat] -= (equipments[r][mat]*16 + equipments[r][mat]*4 + equipments[r][mat]*1) * count;
+  }
+  const ul = document.getElementById('leftover_list');
+  ul.innerHTML = '';
+  for (let mat in leftover) {
+    const li = document.createElement('li');
+    li.textContent = `${mat}: ${leftover[mat]}`;
+    ul.appendChild(li);
+  }
+
+  //カウントリセット
+  let countBox = Array.from(document.getElementsByClassName('count-box'));
+  countBox.forEach(input => input.value = 0);
+
+  for (let r in actualCounts) {
+    actualCounts[r] = 0;
+  }
+}
+
+document.getElementById('calculateBtn').addEventListener('click', calculate);
+showRecipeTable();
+</script>
+</body>
+</html>
