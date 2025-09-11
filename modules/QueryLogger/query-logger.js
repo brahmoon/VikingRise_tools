@@ -1,6 +1,6 @@
 const CONFIG = {
     RECAPTCHA_SITE_KEY: '6LcrZMQrAAAAABr2uYU5F53pEG46ZnU4LYxXXzWH',
-    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbzlVwBonJWyXfwVBXR_SBbUbEh51wweu6U-k0u7RIVXlCMyvBasDTzlaDRftPh49LKt/exec',
+    APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycby1aQG3ih1BOvPrpwF2v1RtfY8ZtA4TPWhsXuxhEOqNlYphr8RyIlgpsEJa_3nYj23V/exec',
     ALLOWED_ORIGINS: ['https://brahmoon.github.io']
 };
 
