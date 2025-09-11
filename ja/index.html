@@ -4,8 +4,6 @@
   <meta charset="UTF-8" />
   <title>VRツールメニュー</title>
   <script src="https://brahmoon.github.io/VikingRise_tools/modules/QueryPropagete/query-propagate.js"></script>
-  <script>
-  </script>
 </head>
 <body>
   <h1>VikingRise ツール一覧</h1>
@@ -21,31 +19,30 @@
   
   <script type="module">
   document.addEventListener('DOMContentLoaded', async () => {
-    await (async () => {
-      const currentLang = location.pathname.split('/')[2];
+    const currentLang = location.pathname.split('/')[2];
 
-      fetch('../lang-switcher.html')
-        .then(res => res.text())
-        .then(html => {
-          const temp = document.createElement('div');
-          temp.innerHTML = html;
-    
-          const links = temp.querySelectorAll('[data-lang]');
-          links.forEach(link => {
-            if (link.dataset.lang === currentLang) {
-              link.remove();
-            }
-          });
-    
-          const filteredLinks = Array.from(temp.querySelectorAll('[data-lang]'))
-            .map(link => link.outerHTML)
-            .join(' / ');
-    
-          document.getElementById('lang-switcher-container').innerHTML = filteredLinks;
-        });
-    })();
-    
-    await exec_propagateQuery();
+    // 言語切替リンクをロード
+    const res = await fetch('../lang-switcher.html');
+    const html = await res.text();
+
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+
+    // 現在の言語を削除
+    const links = temp.querySelectorAll('[data-lang]');
+    links.forEach(link => {
+      if (link.dataset.lang === currentLang) {
+        link.remove();
+      }
+    });
+
+    // コンテナに挿入
+    const container = document.getElementById('lang-switcher-container');
+    container.innerHTML = Array.from(temp.querySelectorAll('[data-lang]'))
+      .map(link => link.outerHTML)
+      .join(' / ');
+
+    exec_propagateQuery();
   });
   </script>
 </body>
