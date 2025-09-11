@@ -84,9 +84,10 @@
   <div id="result"></div>
 
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      grecaptcha.ready(async () => { await exec_sendData() });
+    document.addEventListener('DOMContentLoaded', async () => {
+      await exec_sendData();
     });
+    
     const shardTable = [
       [10, 30, 50, 70, 90],   // Grade 1 累積必要数
       [105, 125, 145, 165, 185],
