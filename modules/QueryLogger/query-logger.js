@@ -1,3 +1,4 @@
+//query-logger.js
 const CONFIG = {
     RECAPTCHA_SITE_KEY: '6LcrZMQrAAAAABr2uYU5F53pEG46ZnU4LYxXXzWH',
     APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycby1aQG3ih1BOvPrpwF2v1RtfY8ZtA4TPWhsXuxhEOqNlYphr8RyIlgpsEJa_3nYj23V/exec',
@@ -6,12 +7,27 @@ const CONFIG = {
 
 function loadReCaptcha(siteKey) {
     return new Promise((resolve, reject) => {
-        if (window.grecaptcha) return resolve(window.grecaptcha);
+        if (window.grecaptcha && window.grecaptcha.execute) {
+            return resolve(window.grecaptcha);
+        }
+        
         const script = document.createElement("script");
         script.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
         script.async = true;
-        script.onload = () => resolve(window.grecaptcha);
-        script.onerror = reject;
+        
+        script.onload = () => {
+            // reCAPTCHAが完全に読み込まれるまで待機
+            const checkReady = () => {
+                if (window.grecaptcha && window.grecaptcha.execute) {
+                    resolve(window.grecaptcha);
+                } else {
+                    setTimeout(checkReady, 100);
+                }
+            };
+            checkReady();
+        };
+        
+        script.onerror = () => reject(new Error('Failed to load reCAPTCHA'));
         document.head.appendChild(script);
     });
 }
@@ -34,7 +50,15 @@ function validateParams(params) {
 }
 
 async function getReCaptchaToken() {
-    return await grecaptcha.execute(CONFIG.RECAPTCHA_SITE_KEY, { action: 'log_query' });
+    try {
+        if (!window.grecaptcha || !window.grecaptcha.execute) {
+            throw new Error('reCAPTCHA not loaded');
+        }
+        return await grecaptcha.execute(CONFIG.RECAPTCHA_SITE_KEY, { action: 'log_query' });
+    } catch (error) {
+        console.error('reCAPTCHA execution error:', error);
+        throw error;
+    }
 }
 
 function sendDataViaJsonp(data) {
@@ -143,16 +167,21 @@ async function sendData(data) {
 
 async function exec_sendData() {
     try {
-        await loadReCaptcha(CONFIG.RECAPTCHA_SITE_KEY);
-        const params = parseQueryParams();
+        console.log('Starting exec_sendData...');
         
+        // reCAPTCHAの読み込みを待機
+        await loadReCaptcha(CONFIG.RECAPTCHA_SITE_KEY);
+        console.log('reCAPTCHA loaded successfully');
+        
+        const params = parseQueryParams();
         console.log('Parsed params:', params);
         
         if (!validateParams(params)) {
             console.log('Validation failed - missing required params');
-            return;
+            return { success: false, message: 'Missing required parameters' };
         }
         
+        console.log('Validation passed, getting reCAPTCHA token...');
         const recaptchaToken = await getReCaptchaToken();
         console.log('reCAPTCHA token obtained');
         
@@ -174,5 +203,6 @@ async function exec_sendData() {
         return result;
     } catch (error) {
         console.error('exec_sendData error:', error);
+        return { success: false, message: error.message };
     }
 }
