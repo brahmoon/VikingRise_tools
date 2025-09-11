@@ -206,3 +206,11 @@ async function exec_sendData() {
         return { success: false, message: error.message };
     }
 }
+//<head>
+//<script src="https://brahmoon.github.io/VikingRise_tools/modules/QueryLogger/query-logger.js"></script>
+//
+//<body>
+//<script type="module">
+//  document.addEventListener('DOMContentLoaded', async () => {
+//    await exec_sendData();
+//  });
