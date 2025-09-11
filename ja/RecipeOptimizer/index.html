@@ -78,6 +78,10 @@ button.small-btn { padding: 2px 6px; margin: 0 2px; }
 </div>
 
 <script type="module">
+document.addEventListener('DOMContentLoaded', () => {
+    grecaptcha.ready(async () => { await exec_sendData() });
+});
+  
 import GLPK from "./lib/index.js";
 
 const recipes = {
