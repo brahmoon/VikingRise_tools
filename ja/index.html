@@ -22,7 +22,7 @@
   <script type="module">
   document.addEventListener('DOMContentLoaded', async () => {
     await exec_propagateQuery();
-    await () => {
+    await (async () => {
       const currentLang = location.pathname.split('/')[2];
 
       fetch('../lang-switcher.html')
@@ -44,7 +44,7 @@
     
           document.getElementById('lang-switcher-container').innerHTML = filteredLinks;
         });
-    }
+    });
   });
   </script>
 </body>
