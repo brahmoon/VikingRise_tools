@@ -4,10 +4,17 @@ const CONFIG = {
     ALLOWED_ORIGINS: ['https://brahmoon.github.io']
 };
 
-const recaptchaScript = document.createElement("script");
-recaptchaScript.src = `https://www.google.com/recaptcha/api.js?render=${CONFIG.RECAPTCHA_SITE_KEY}`;
-recaptchaScript.async = true;
-document.head.appendChild(recaptchaScript);
+function loadReCaptcha(siteKey) {
+    return new Promise((resolve, reject) => {
+        if (window.grecaptcha) return resolve(window.grecaptcha);
+        const script = document.createElement("script");
+        script.src = `https://www.google.com/recaptcha/api.js?render=${siteKey}`;
+        script.async = true;
+        script.onload = () => resolve(window.grecaptcha);
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+}
 
 function parseQueryParams() {
     const params = new URLSearchParams(window.location.search);
@@ -136,6 +143,7 @@ async function sendData(data) {
 
 async function exec_sendData() {
     try {
+        await loadReCaptcha(CONFIG.RECAPTCHA_SITE_KEY);
         const params = parseQueryParams();
         if (!validateParams(params)) return;
         const recaptchaToken = await getReCaptchaToken();
