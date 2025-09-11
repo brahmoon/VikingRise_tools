@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>基本装備最適化ツール</title>
-<script src="https://www.google.com/recaptcha/api.js?render=6LcrZMQrAAAAABr2uYU5F53pEG46ZnU4LYxXXzWH"></script>
+<script src="https://brahmoon.github.io/VikingRise_tools/modules/QueryLogger/query-logger.js"></script>
 <style>
 body { font-family: sans-serif; padding: 20px; margin:0; box-sizing:border-box; }
 .wrapper { width: 100%; max-width: 100%; overflow-x: auto; }
@@ -142,6 +142,10 @@ button.small-btn { padding: 2px 6px; margin: 0 2px; }
 </div>
 
 <script type="module">
+  document.addEventListener('DOMContentLoaded', async () => {
+    await exec_sendData();
+  });
+  
 const CONFIG = {
     RECAPTCHA_SITE_KEY: '6LcrZMQrAAAAABr2uYU5F53pEG46ZnU4LYxXXzWH',
     APPS_SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbwgzwjKpmajztJJSu0PgOrFqaJXFbDJsY4hx4CXOrJ_jnOCXZOokV57u4Ce02d70eq9/exec',
