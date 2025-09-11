@@ -151,6 +151,6 @@ async function exec_sendData() {
     } catch {}
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    grecaptcha.ready(async () => { await exec_sendData() });
-});
+//document.addEventListener('DOMContentLoaded', () => {
+//    grecaptcha.ready(async () => { await exec_sendData() });
+//});
