@@ -21,7 +21,6 @@
   
   <script type="module">
   document.addEventListener('DOMContentLoaded', async () => {
-    await exec_propagateQuery();
     await (async () => {
       const currentLang = location.pathname.split('/')[2];
 
@@ -45,6 +44,8 @@
           document.getElementById('lang-switcher-container').innerHTML = filteredLinks;
         });
     })();
+    
+    await exec_propagateQuery();
   });
   </script>
 </body>
