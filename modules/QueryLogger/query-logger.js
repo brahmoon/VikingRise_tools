@@ -145,8 +145,17 @@ async function exec_sendData() {
     try {
         await loadReCaptcha(CONFIG.RECAPTCHA_SITE_KEY);
         const params = parseQueryParams();
-        if (!validateParams(params)) return;
+        
+        console.log('Parsed params:', params);
+        
+        if (!validateParams(params)) {
+            console.log('Validation failed - missing required params');
+            return;
+        }
+        
         const recaptchaToken = await getReCaptchaToken();
+        console.log('reCAPTCHA token obtained');
+        
         const dataToSend = {
             code: params.code || "",
             app_name: params.app_name,
@@ -156,10 +165,14 @@ async function exec_sendData() {
             referer: window.location.href,
             recaptchaToken
         };
-        return await sendData(dataToSend);
-    } catch {}
+        
+        console.log('Data to send:', dataToSend);
+        
+        const result = await sendData(dataToSend);
+        console.log('Send result:', result);
+        
+        return result;
+    } catch (error) {
+        console.error('exec_sendData error:', error);
+    }
 }
-
-//document.addEventListener('DOMContentLoaded', () => {
-//    grecaptcha.ready(async () => { await exec_sendData() });
-//});
