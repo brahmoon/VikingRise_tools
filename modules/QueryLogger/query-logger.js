@@ -147,10 +147,10 @@ async function exec_sendData() {
             referer: window.location.href,
             recaptchaToken
         };
-        await sendData(dataToSend);
+        return await sendData(dataToSend);
     } catch {}
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    grecaptcha.ready(exec_sendData);
+    grecaptcha.ready(async () => { await exec_sendData() });
 });
