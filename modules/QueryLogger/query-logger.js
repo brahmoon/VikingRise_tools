@@ -143,6 +143,7 @@ async function exec_sendData() {
             code: params.code || "",
             app_name: params.app_name,
             char_id: params.char_id,
+            user_lang: window.navigator.langage,
             origin: window.location.origin,
             referer: window.location.href,
             recaptchaToken
