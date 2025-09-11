@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>英雄欠片計算ツール（SX）</title>
+  <script src="https://brahmoon.github.io/VikingRise_tools/modules/QueryLogger/query-logger.js"></script>
   <style>
     body {
       font-family: "Segoe UI", sans-serif;
@@ -83,6 +84,9 @@
   <div id="result"></div>
 
   <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      grecaptcha.ready(async () => { await exec_sendData() });
+    });
     const shardTable = [
       [10, 30, 50, 70, 90],   // Grade 1 累積必要数
       [105, 125, 145, 165, 185],
