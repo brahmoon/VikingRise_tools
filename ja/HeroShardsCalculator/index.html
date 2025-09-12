@@ -87,6 +87,7 @@
 
   <script type="module">
     document.addEventListener('DOMContentLoaded', async () => {
+      await exec_propagateQuery();
       await exec_sendData();
 
       // 初期状態で★1に設定
