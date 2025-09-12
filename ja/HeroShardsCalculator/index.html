@@ -81,15 +81,21 @@
   <label for="owned-general">保有している汎用欠片の数：</label>
   <input type="number" id="owned-general" min="0" />
   
-  <button onclick="calculate()">計算</button>
+  <button id="calculateBtn">計算</button>
 
   <div id="result"></div>
 
   <script type="module">
     document.addEventListener('DOMContentLoaded', async () => {
       await exec_sendData();
+
+      // 初期状態で★1に設定
+      updateStars(selectedStars);
+
+      // 計算ボタンにイベントリスナーを設定
+      document.getElementById("calculateBtn").addEventListener("click", calculate);
     });
-    
+
     const shardTable = [
       [10, 30, 50, 70, 90],   // Grade 1 累積必要数
       [105, 125, 145, 165, 185],
@@ -127,9 +133,6 @@
       const needed = Math.max(0, maxShard - currentTotal - owned - owned_general);
       document.getElementById("result").textContent = `覚醒まで残り${needed}枚必要`;
     }
-
-    // 初期状態で★1に設定
-    updateStars(selectedStars);
   </script>
 </body>
 </html>
