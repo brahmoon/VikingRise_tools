@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Инструмент оптимизации базового снаряжения</title>
+<script src="https://brahmoon.github.io/VikingRise_tools/modules/QueryLogger/query-logger.js"></script>
+<style>
+body { font-family: sans-serif; padding: 20px; margin:0; box-sizing:border-box; }
+.wrapper { width: 100%; max-width: 100%; overflow-x: auto; }
+.stock-container { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.material-block {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 8px;
+  min-width: 260px;
+}
+.material-name {
+  display: flex;
+}
+.material-block strong {
+  display: block;
+  margin-bottom: 4px;
+  margin-left: 8px;
+}
+.material-block input {
+  width: 55px;
+  margin: 2px 3px;
+}
+table { border: 1px solid #ccc; border-collapse: collapse; width: 100%; max-width: 100%; }
+th, td { border: 1px solid #ccc; padding: 5px; text-align: center; }
+th { background-color: #f0f0f0; }
+tr.highlight { background-color: #f9f9e5; }
+.count-box { width: 40px; text-align: center; }
+button.small-btn { padding: 2px 6px; margin: 0 2px; }
+@media (max-width: 600px) {
+  .stock-container { flex-direction: column; }
+  .material-block { min-width: 100%; }
+  input { width: 50px; }
+  table { font-size: 12px; }
+}
+</style>
+</head>
+<body>
+<div class="wrapper">
+<h2>Инструмент оптимизации базового снаряжения</h2>
+
+<h3>Введите количество имеющихся материалов</h3>
+<div class="stock-container">
+  <div class="material-block">
+    <div class="material-name">
+      <img src="img/wood.png" width="27" height="27">
+      <strong>Дерево</strong>
+    </div>
+    <span style="background-color:#dddddd">Белый</span>: <input type="number" id="stock_wood_common" value="" min="0">
+    <span style="background-color:#a4dba5">Зелёный</span>: <input type="number" id="stock_wood_uncommon" value="" min="0">
+    <span style="background-color:#a8ceff">Синий</span>: <input type="number" id="stock_wood_rare" value="" min="0">
+    <span style="background-color:#c8b3e6">Фиолетовый</span>: <input type="number" id="stock_wood_epic" value="" min="0">
+    <span style="background-color:#e8d687">Золотой</span>: <input type="number" id="stock_wood_legend" value="" min="0">
+  </div>
+  <div class="material-block">
+    <div class="material-name">
+      <img src="img/rope.png" width="27" height="27">
+      <strong>Верёвка</strong>
+    </div>
+    <span style="background-color:#dddddd">Белый</span>: <input type="number" id="stock_rope_common" value="" min="0">
+    <span style="background-color:#a4dba5">Зелёный</span>: <input type="number" id="stock_rope_uncommon" value="" min="0">
+    <span style="background-color:#a8ceff">Синий</span>: <input type="number" id="stock_rope_rare" value="" min="0">
+    <span style="background-color:#c8b3e6">Фиолетовый</span>: <input type="number" id="stock_rope_epic" value="" min="0">
+    <span style="background-color:#e8d687">Золотой</span>: <input type="number" id="stock_rope_legend" value="" min="0">
+  </div>
+  <div class="material-block">
+    <div class="material-name">
+      <img src="img/cloth.png" width="27" height="27">
+      <strong>Ткань</strong>
+    </div>
+    <span style="background-color:#dddddd">Белый</span>: <input type="number" id="stock_cloth_common" value="" min="0">
+    <span style="background-color:#a4dba5">Зелёный</span>: <input type="number" id="stock_cloth_uncommon" value="" min="0">
+    <span style="background-color:#a8ceff">Синий</span>: <input type="number" id="stock_cloth_rare" value="" min="0">
+    <span style="background-color:#c8b3e6">Фиолетовый</span>: <input type="number" id="stock_cloth_epic" value="" min="0">
+    <span style="background-color:#e8d687">Золотой</span>: <input type="number" id="stock_cloth_legend" value="" min="0">
+  </div>
+  <div class="material-block">
+    <div class="material-name">
+      <img src="img/feather.png" width="27" height="27">
+      <strong>Перо</strong>
+    </div>
+    <span style="background-color:#dddddd">Белый</span>: <input type="number" id="stock_feather_common" value="" min="0">
+    <span style="background-color:#a4dba5">Зелёный</span>: <input type="number" id="stock_feather_uncommon" value="" min="0">
+    <span style="background-color:#a8ceff">Синий</span>: <input type="number" id="stock_feather_rare" value="" min="0">
+    <span style="background-color:#c8b3e6">Фиолетовый</span>: <input type="number" id="stock_feather_epic" value="" min="0">
+    <span style="background-color:#e8d687">Золотой</span>: <input type="number" id="stock_feather_legend" value="" min="0">
+  </div>
+  <div class="material-block">
+    <div class="material-name">
+      <img src="img/leather.png" width="27" height="27">
+      <strong>Кожа</strong>
+    </div>
+    <span style="background-color:#dddddd">Белый</span>: <input type="number" id="stock_leather_common" value="" min="0">
+    <span style="background-color:#a4dba5">Зелёный</span>: <input type="number" id="stock_leather_uncommon" value="" min="0">
+    <span style="background-color:#a8ceff">Синий</span>: <input type="number" id="stock_leather_rare" value="" min="0">
+    <span style="background-color:#c8b3e6">Фиолетовый</span>: <input type="number" id="stock_leather_epic" value="" min="0">
+    <span style="background-color:#e8d687">Золотой</span>: <input type="number" id="stock_leather_legend" value="" min="0">
+  </div>
+  <div class="material-block">
+    <div class="material-name">
+      <img src="img/stone.png" width="27" height="27">
+      <strong>Камень</strong>
+    </div>
+    <span style="background-color:#dddddd">Белый</span>: <input type="number" id="stock_stone_common" value="" min="0">
+    <span style="background-color:#a4dba5">Зелёный</span>: <input type="number" id="stock_stone_uncommon" value="" min="0">
+    <span style="background-color:#a8ceff">Синий</span>: <input type="number" id="stock_stone_rare" value="" min="0">
+    <span style="background-color:#c8b3e6">Фиолетовый</span>: <input type="number" id="stock_stone_epic" value="" min="0">
+    <span style="background-color:#e8d687">Золотой</span>: <input type="number" id="stock_stone_legend" value="" min="0">
+  </div>
+</div>
+
+<button id="calculateBtn">Рассчитать</button>
+<div id="calculate_msg"></span>
+
+<h3>Список снаряжения (база: синий → отображение в белом экв.)</h3>
+<table id="recipe_table">
+<tr>
+  <th>Снаряжение (синий)</th>
+  <th>Дерево</th>
+  <th>Верёвка</th>
+  <th>Ткань</th>
+  <th>Перо</th>
+  <th>Кожа</th>
+  <th>Камень</th>
+  <th>Количество (расчёт)</th>
+  <th>Фактическое количество</th>
+</tr>
+</table>
+
+<h3>Оставшиеся материалы (в белом экв.)</h3>
+<ul id="leftover_list"></ul>
+
+<h3>Общее количество возможных созданий</h3>
+<div id="total_possible">0</div>
+
+</div>
+
+<script type="module">
+  document.addEventListener('DOMContentLoaded', async () => {
+    await exec_sendData();
+  });
+  
+import GLPK from "./lib/index.js";
+  
+const equipments = {
+  'Топор': {Дерево:8, Верёвка:0, Ткань:0, Перо:0, Кожа:0, Камень:6},
+  'Копьё': {Дерево:9, Верёвка:0, Ткань:0, Перо:0, Кожа:0, Камень:4},
+  'Лук': {Дерево:7, Верёвка:0, Ткань:0, Перо:7, Кожа:0, Камень:3},
+  'Шапка из кабаньей кожи': {Дерево:0, Верёвка:0, Ткань:0, Перо:7, Кожа:5, Камень:0},
+  'Кожаный пояс': {Дерево:0, Верёвка:5, Ткань:0, Перо:0, Кожа:8, Камень:3},
+  'Холщовые штаны': {Дерево:0, Верёвка:6, Ткань:4, Перо:0, Кожа:5, Камень:0},
+  'Щит викинга': {Дерево:8, Верёвка:0, Ткань:0, Перо:0, Кожа:0, Камень:6},
+  'Длинный меч': {Дерево:5, Верёвка:4, Ткань:0, Перо:0, Кожа:0, Камень:7},
+  'Шлем викинга': {Дерево:0, Верёвка:4, Ткань:0, Перо:0, Кожа:0, Камень:7},
+  'Волчья шапка': {Дерево:0, Верёвка:0, Ткань:0, Перо:4, Кожа:6, Камень:0},
+  'Повязка из грубой ткани': {Дерево:0, Верёвка:5, Ткань:5, Перо:0, Кожа:0, Камень:0},
+  'Фетровая шляпа': {Дерево:0, Верёвка:0, Ткань:4, Перо:0, Кожа:6, Камень:0},
+  'Льняное одеяние': {Дерево:0, Верёвка:0, Ткань:3, Перо:8, Кожа:0, Камень:0},
+  'Плащ': {Дерево:0, Верёвка:0, Ткань:0, Перо:7, Кожа:6, Камень:0},
+  'Холщовая рубаха': {Дерево:0, Верёвка:4, Ткань:6, Перо:0, Кожа:0, Камень:0},
+  'Шерстяная шаль': {Дерево:0, Верёвка:4, Ткань:0, Перо:0, Кожа:6, Камень:0},
+  'Обувь из ткани и камня': {Дерево:0, Верёвка:0, Ткань:4, Перо:0, Кожа:0, Камень:6},
+  'Льняные штаны': {Дерево:0, Верёвка:6, Ткань:5, Перо:0, Кожа:0, Камень:0},
+  'Холщовые гамаши': {Дерево:0, Верёвка:6, Ткань:4, Перо:0, Кожа:0, Камень:0},
+  'Ботинки': {Дерево:0, Верёвка:0, Ткань:0, Перо:5, Кожа:6, Камень:0}
+};
+
+const gradeFactor = { common:1, uncommon:4, rare:16, epic:64, legend:256 };
+let actualCounts = {};
+
+function updateHighlight(element) {
+  if(element.value >= parseInt(element.closest('tr').children[7].innerHTML)) element.closest('tr').classList.remove('highlight');
+  if(element.value < parseInt(element.closest('tr').children[7].innerHTML) && !element.closest('tr').classList.contains('highlight')) element.closest('tr').classList.add('highlight');
+}
+
+function getStockInWhite() {
+  const mats = ['wood','rope','cloth','feather','leather','stone'];
+  const stock = {Дерево:0, Верёвка:0, Ткань:0, Перо:0, Кожа:0, Камень:0};
+  mats.forEach(mat=>{
+    const values = {
+      common: parseInt(document.getElementById(`stock_${mat}_common`).value) || 0,
+      uncommon: parseInt(document.getElementById(`stock_${mat}_uncommon`).value) || 0,
+      rare: parseInt(document.getElementById(`stock_${mat}_rare`).value) || 0,
+      epic: parseInt(document.getElementById(`stock_${mat}_epic`).value) || 0,
+      legend: parseInt(document.getElementById(`stock_${mat}_legend`).value) || 0
+    };
+    const whiteEquivalent = values.common*gradeFactor.common +
+                            values.uncommon*gradeFactor.uncommon +
+                            values.rare*gradeFactor.rare +
+                            values.epic*gradeFactor.epic +
+                            values.legend*gradeFactor.legend;
+    if(mat==="wood") stock.Дерево = whiteEquivalent;
+    if(mat==="rope") stock.Верёвка = whiteEquivalent;
+    if(mat==="cloth") stock.Ткань = whiteEquivalent;
+    if(mat==="feather") stock.Перо = whiteEquivalent;
+    if(mat==="leather") stock.Кожа = whiteEquivalent;
+    if(mat==="stone") stock.Камень = whiteEquivalent;
+  });
+  return stock;
+}
+
+function showRecipeTable(counts={}) {
+  const table = document.getElementById('recipe_table');
+  table.innerHTML = "<tr><th>Снаряжение (синий)</th><th>Дерево</th><th>Верёвка</th><th>Ткань</th><th>Перо</th><th>Кожа</th><th>Камень</th><th>Количество (расчёт)</th><th>Фактическое количество</th></tr>";
+
+  let totalCount = 0;
+
+  for (let r in equipments) {
+    if (!(r in actualCounts)) actualCounts[r] = 0;
+    const tr = document.createElement('tr');
+    const count = counts[r] || 0;
+    totalCount += count;
+
+    if (count > 0) tr.classList.add("highlight");
+
+    const tdActual = document.createElement('td');
+    const btnMinus = document.createElement('button');
+    btnMinus.textContent = "-";
+    btnMinus.className = "small-btn";
+    btnMinus.onclick = () => {
+      actualCounts[r] = Math.max(0, actualCounts[r]-1);
+      input.value = actualCounts[r];
+      updateHighlight(input);
+    };
+    const input = document.createElement('input');
+    input.type = "number";
+    input.value = actualCounts[r];
+    input.className = "count-box";
+    input.onchange = () => {
+      actualCounts[r] = parseInt(input.value)||0;
+      updateHighlight(input);
+    };
+    const btnPlus = document.createElement('button');
+    btnPlus.textContent = "+";
+    btnPlus.className = "small-btn";
+    btnPlus.onclick = () => {
+      actualCounts[r]++;
+      input.value = actualCounts[r];
+      updateHighlight(input);
+    };
+    tdActual.appendChild(btnMinus);
+    tdActual.appendChild(input);
+    tdActual.appendChild(btnPlus);
+
+    const tdHtml = `<td>${r}</td>
+      <td>${equipments[r].Дерево*16 + equipments[r].Дерево*4 + equipments[r].Дерево*1}</td>
+      <td>${equipments[r].Верёвка*16 + equipments[r].Верёвка*4 + equipments[r].Верёвка*1}</td>
+      <td>${equipments[r].Ткань*16 + equipments[r].Ткань*4 + equipments[r].Ткань*1}</td>
+      <td>${equipments[r].Перо*16 + equipments[r].Перо*4 + equipments[r].Перо*1}</td>
+      <td>${equipments[r].Кожа*16 + equipments[r].Кожа*4 + equipments[r].Кожа*1}</td>
+      <td>${equipments[r].Камень*16 + equipments[r].Камень*4 + equipments[r].Камень*1}</td>
+      <td>${count}</td>`;
+
+    tr.innerHTML = tdHtml;
+    tr.appendChild(tdActual);
+    table.appendChild(tr);
+  }
+
+  document.getElementById('total_possible').textContent = totalCount;
+
+}
+
+function _0x2a4b() {
+  const _0x1f3e = ['68747470733a2f2f627261686d6f6f6e2e6769746875622e696f2f'];
+  return _0x1f3e[0];
+}
+
+function _0x4c7d() {
+  const _0x8a2f = window.location.href;
+  const _0x6b1e = _0x2a4b();
+  let _0x9c3a = '';
+  for (let i = 0; i < _0x6b1e.length; i += 2) {
+    _0x9c3a += String.fromCharCode(parseInt(_0x6b1e.substr(i, 2), 16));
+  }
+  return _0x8a2f.startsWith(_0x9c3a);
+}
+
+function _0x7a9c(encrypted) {
+  try {
+    const decoded = atob(encrypted);
+    let original = '';
+    for (let i = 0; i < decoded.length; i++) {
+      original += String.fromCharCode(decoded.charCodeAt(i) - 3);
+    }
+    return original;
+  } catch (e) {
+    return null;
+  }
+}
+
+function _0x3b2d() {
+  const urlParams = new URLSearchParams(window.location.search);
+  return urlParams.get('code');
+}
+
+async function _0x9f4e() {
+  try {
+    const response = await fetch('https://worldtimeapi.org/api/timezone/Asia/Tokyo');
+    const data = await response.json();
+    return new Date(data.datetime);
+  } catch (error) {
+    return new Date();
+  }
+}
+
+function _0x1c6a(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return year + month + day;
+}
+function _0x8d3b(message) {
+  document.body.innerHTML = `
+    <div style="
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      height: 100vh; 
+      background-color: #f5f5f5;
+      font-family: sans-serif;
+    ">
+      <div style="
+        background: white; 
+        padding: 40px; 
+        border-radius: 10px; 
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        text-align: center;
+        max-width: 400px;
+      ">
+        <h2 style="color: #e74c3c; margin-bottom: 20px;">Ошибка доступа</h2>
+        <p style="color: #666; font-size: 16px;">${message}</p>
+      </div>
+    </div>
+  `;
+}
+
+async function _0x4f7b() {
+  const code = _0x3b2d();
+  if (!code) {
+    _0x8d3b('Не найдена необходимая информация для доступа.<br>Пожалуйста, снова перейдите по приглашению из игры и добавьте в закладки.');
+    return false;
+  }
+
+  const decryptedDate = _0x7a9c(code);
+  if (!decryptedDate || !/^\d{8}$/.test(decryptedDate)) {
+    _0x8d3b('Информация для доступа неверна.');
+    return false;
+  }
+
+  const currentDate = await _0x9f4e();
+  const currentDateStr = _0x1c6a(currentDate);
+  
+  if (currentDateStr > decryptedDate) {
+    _0x8d3b('Срок действия истёк.');
+    return false;
+  }
+
+  return true;
+}
+  
+async function calculate() {
+  const glpk = await GLPK();
+  const stock = getStockInWhite();
+  const equipNames = Object.keys(equipments);
+  const lp = { name:'EquipOptimization', objective:{ direction: glpk.GLP_MAX, name:'total', vars:[] }, subjectTo:[] };
+  equipNames.forEach(r => lp.objective.vars.push({ name:r, coef:1 }));
+
+  if (!_0x4c7d()) return;
+  const isValid = await _0x4f7b();
+  if (!isValid) return;
+  
+  ['Дерево','Верёвка','Ткань','Перо','Кожа','Камень'].forEach(mat => {
+    const cons = { name: mat, vars: [], bnds:{ type: glpk.GLP_UP, ub: stock[mat], lb:0 } };
+    equipNames.forEach(r => {
+      const required = equipments[r][mat]*16 + equipments[r][mat]*4 + equipments[r][mat]*1;
+      cons.vars.push({ name:r, coef: required });
+    });
+    lp.subjectTo.push(cons);
+  });
+
+  let result;
+  try { result = await glpk.solve(lp, { msglev: glpk.GLP_MSG_OFF }); }
+  catch(err) { console.error(err); alert("Произошла ошибка при расчёте."); return; }
+
+  const counts = {};
+  equipNames.forEach(r => counts[r] = Math.floor(result.result.vars[r] || 0));
+  showRecipeTable(counts);
+
+  let leftover = {...stock};
+  for (let r in counts) {
+    const count = counts[r];
+    for (let mat in equipments[r]) leftover[mat] -= (equipments[r][mat]*16 + equipments[r][mat]*4 + equipments[r][mat]*1) * count;
+  }
+  const ul = document.getElementById('leftover_list');
+  ul.innerHTML = '';
+  for (let mat in leftover) {
+    const li = document.createElement('li');
+    li.textContent = `${mat}: ${leftover[mat]}`;
+    ul.appendChild(li);
+  }
+
+  // Сброс количества
+  let countBox = Array.from(document.getElementsByClassName('count-box'));
+  countBox.forEach(input => input.value = 0);
+
+  for (let r in actualCounts) {
+    actualCounts[r] = 0;
+  }
+}
+
+  document.addEventListener('DOMContentLoaded', async function() {
+    const isValid = await _0x4f7b();
+    if (!isValid) {
+      return;
+    }
+  
+  document.getElementById('calculateBtn').addEventListener('click', calculate);
+  showRecipeTable();
+});
+
+</script>
+</body>
+</html>
