@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Item Detect + Hash + Rarity + OCR</title>
+<style>
+body { font-family: sans-serif; margin: 20px; }
+canvas { border: 1px solid #aaa; }
+#result { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; }
+.item { text-align: center; cursor: pointer; }
+.item canvas {
+  width: 64px; height: 64px;
+  border: 1px solid #666;
+  image-rendering: pixelated;
+}
+.label { font-size: 12px; white-space: nowrap; }
+pre {
+  background: #f5f5f5;
+  padding: 10px;
+  max-height: 300px;
+  overflow: auto;
+}
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 6px;
+  border: 1px solid #ccc;
+  border-radius: 999px;
+  margin-left: 6px;
+}
+.small {
+  font-size: 11px;
+  opacity: 0.75;
+}
+</style>
+</head>
+<body>
+
+<h2>アイテム判別 + レアリティ判定 + 数量OCR PoC</h2>
+
+<input type="file" id="file" accept="image/*">
+<p>または Ctrl+V で画像貼り付け</p>
+
+<div class="small">
+  OCR初回はWASM読込で少し時間がかかります。数量領域が合わない場合は下の「OCR切り出し設定」を調整してください。
+  <span id="ocrStatus" class="badge">OCR: not loaded</span>
+</div>
+
+<canvas id="src"></canvas>
+
+<h3>検出アイテム</h3>
+<div id="result"></div>
+
+<h3>登録DB（JSON）</h3>
+<pre id="dbview"></pre>
+
+<!-- tesseract.js (WASM) -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+<script>
+const srcCanvas = document.getElementById("src");
+const srcCtx = srcCanvas.getContext("2d");
+const result = document.getElementById("result");
+const dbview = document.getElementById("dbview");
+const ocrStatus = document.getElementById("ocrStatus");
+
+const ITEM_DB_KEY = "item_hash_db";
+const RARITY_DB_KEY = "rarity_color_db";
+
+const itemDB = JSON.parse(localStorage.getItem(ITEM_DB_KEY) || "{}");
+const rarityDB = JSON.parse(localStorage.getItem(RARITY_DB_KEY) || "{}");
+
+const RARITIES = ["Common","Uncommon","Rare","Epic","Legendary"];
+
+// ---- OCR: crop settings (tune here) ----
+// 右下を想定：幅40% 高さ28%、少し内側へ
+const OCR_CROP = {
+  x: 0.55,   // 左上X（0-1）
+  y: 0.68,   // 左上Y（0-1）
+  w: 0.42,   // 幅（0-1）
+  h: 0.28    // 高さ（0-1）
+};
+// 二値化の閾値（数字が白系なら 150-210 あたりで調整）
+const OCR_BIN_THRESHOLD = 170;
+
+// OCR判定を軽くする（小さすぎると精度低下するので注意）
+const OCR_RESIZE_W = 180; // OCR前に横幅をこれに拡大/縮小
+// --------------------------------------
+
+updateDBView();
+
+// ---------- OCR Worker (single instance) ----------
+let ocrWorker = null;
+let ocrReady = false;
+let ocrQueue = Promise.resolve();
+
+async function ensureOcrWorker(){
+  if (ocrReady) return;
+
+  if (!ocrWorker) {
+    ocrStatus.textContent = "OCR: loading...";
+    ocrWorker = await Tesseract.createWorker({
+      logger: () => {} // 必要なら console.log に変更
+    });
+  }
+
+  await ocrWorker.loadLanguage("eng");
+  await ocrWorker.initialize("eng");
+
+  // 数字だけ認識
+  await ocrWorker.setParameters({
+    tessedit_char_whitelist: "0123456789",
+    tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE
+  });
+
+  ocrReady = true;
+  ocrStatus.textContent = "OCR: ready";
+}
+
+// キューで直列実行（同時実行すると重い/不安定になりがち）
+function enqueueOcr(task){
+  ocrQueue = ocrQueue.then(task).catch(err => {
+    console.error(err);
+  });
+  return ocrQueue;
+}
+
+// ---------- Image Load ----------
+document.getElementById("file").onchange = e => {
+  loadImage(URL.createObjectURL(e.target.files[0]));
+};
+
+document.addEventListener("paste", e => {
+  for (const item of e.clipboardData.items) {
+    if (item.type.startsWith("image")) {
+      loadImage(URL.createObjectURL(item.getAsFile()));
+    }
+  }
+});
+
+function loadImage(url){
+  const img=new Image();
+  img.onload=()=>{
+    srcCanvas.width=img.width;
+    srcCanvas.height=img.height;
+    srcCtx.drawImage(img,0,0);
+    detectFrames();
+  };
+  img.src=url;
+}
+
+// ---------- aHash ----------
+function normalize(canvas){
+  const c=document.createElement("canvas");
+  c.width=c.height=32;
+  const ctx=c.getContext("2d");
+  const m=canvas.width*0.15;
+  ctx.drawImage(canvas,m,m,canvas.width-m*2,canvas.height-m*2,0,0,32,32);
+  return c;
+}
+
+function aHash(canvas){
+  const c=document.createElement("canvas");
+  c.width=c.height=8;
+  const ctx=c.getContext("2d");
+  ctx.drawImage(canvas,0,0,8,8);
+  const d=ctx.getImageData(0,0,8,8).data;
+  let g=[];
+  for(let i=0;i<d.length;i+=4) g.push((d[i]+d[i+1]+d[i+2])/3);
+  const avg=g.reduce((a,b)=>a+b)/64;
+  return g.map(v=>v>avg?1:0).join("");
+}
+
+function hamming(a,b){
+  let d=0;
+  for(let i=0;i<a.length;i++) if(a[i]!==b[i]) d++;
+  return d;
+}
+
+function identifyItem(hash){
+  let best=null,score=999;
+  for(const k in itemDB){
+    const d=hamming(hash,itemDB[k]);
+    if(d<score){score=d;best=k;}
+  }
+  return score<=12?best:null;
+}
+
+// ---------- Rarity Color ----------
+function sampleFrameColor(canvas){
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width, h = canvas.height;
+
+  const pad = Math.max(2, Math.floor(Math.min(w,h) * 0.06));
+  const xs = [pad, w/2|0, w-pad-1];
+  const ys = [pad, h/2|0, h-pad-1];
+
+  const pts = [];
+  for (const x of xs) { pts.push([x, pad]); pts.push([x, h-pad-1]); }
+  for (const y of ys) { pts.push([pad, y]); pts.push([w-pad-1, y]); }
+
+  let r=0,g=0,b=0;
+  for (const [x,y] of pts){
+    const d = ctx.getImageData(x,y,1,1).data;
+    r += d[0]; g += d[1]; b += d[2];
+  }
+  const n = pts.length;
+  return { r:r/n, g:g/n, b:b/n };
+}
+
+function colorDist(a,b){
+  return Math.abs(a.r-b.r)+Math.abs(a.g-b.g)+Math.abs(a.b-b.b);
+}
+
+function identifyRarity(color){
+  // 最も近い色を選ぶ（全比較）
+  let best=null,score=999;
+  for(const r in rarityDB){
+    const d=colorDist(color,rarityDB[r]);
+    if(d<score){score=d;best=r;}
+  }
+  return score<120?best:null;
+}
+
+// ---------- OCR helpers ----------
+function cropNumberArea(itemCanvas){
+  const w = itemCanvas.width, h = itemCanvas.height;
+  const rx = Math.floor(w * OCR_CROP.x);
+  const ry = Math.floor(h * OCR_CROP.y);
+  const rw = Math.max(1, Math.floor(w * OCR_CROP.w));
+  const rh = Math.max(1, Math.floor(h * OCR_CROP.h));
+
+  const c = document.createElement("canvas");
+  c.width = rw;
+  c.height = rh;
+  c.getContext("2d").drawImage(itemCanvas, rx, ry, rw, rh, 0, 0, rw, rh);
+  return c;
+}
+
+function binarizeForOcr(canvas){
+  // 1) サイズ正規化（OCRしやすく）
+  const w = canvas.width, h = canvas.height;
+  const scale = OCR_RESIZE_W / w;
+  const tw = OCR_RESIZE_W;
+  const th = Math.max(1, Math.floor(h * scale));
+
+  const c = document.createElement("canvas");
+  c.width = tw;
+  c.height = th;
+  const ctx = c.getContext("2d");
+  ctx.drawImage(canvas, 0, 0, tw, th);
+
+  // 2) 二値化
+  const img = ctx.getImageData(0,0,tw,th);
+  const d = img.data;
+  for(let i=0;i<d.length;i+=4){
+    const g = (d[i]+d[i+1]+d[i+2]) / 3;
+    const v = (g > OCR_BIN_THRESHOLD) ? 255 : 0;
+    d[i]=d[i+1]=d[i+2]=v;
+    d[i+3]=255;
+  }
+  ctx.putImageData(img,0,0);
+
+  return c;
+}
+
+function cleanupDigits(text){
+  // 数字以外は除去
+  const m = (text || "").replace(/[^\d]/g, "");
+  return m.length ? m : null;
+}
+
+async function ocrDigitsFromItem(itemCanvas){
+  await ensureOcrWorker();
+
+  const numArea = cropNumberArea(itemCanvas);
+  const bin = binarizeForOcr(numArea);
+
+  // tesseract.js は canvas をそのまま渡せる
+  const { data } = await ocrWorker.recognize(bin);
+  return cleanupDigits(data.text);
+}
+
+// ---------- Frame Detection ----------
+function detectFrames(){
+  result.innerHTML="";
+  const w=srcCanvas.width,h=srcCanvas.height;
+  const scale=0.5;
+  const sw=w*scale|0,sh=h*scale|0;
+
+  const tmp=document.createElement("canvas");
+  tmp.width=sw;tmp.height=sh;
+  const tctx=tmp.getContext("2d");
+  tctx.drawImage(srcCanvas,0,0,sw,sh);
+
+  const img=tctx.getImageData(0,0,sw,sh);
+  const g=new Uint8Array(sw*sh);
+  for(let i=0;i<img.data.length;i+=4)
+    g[i/4]=(img.data[i]+img.data[i+1]+img.data[i+2])/3;
+
+  const edge=new Uint8Array(sw*sh);
+  for(let y=1;y<sh;y++)for(let x=1;x<sw;x++){
+    const i=y*sw+x;
+    edge[i]=(Math.abs(g[i]-g[i-1])+Math.abs(g[i]-g[i-sw]))>25;
+  }
+
+  const v=new Uint8Array(sw*sh);
+  for(let i=0;i<sw*sh;i++){
+    if(edge[i]&&!v[i]){
+      let minX=sw,minY=sh,maxX=0,maxY=0;
+      const st=[i];v[i]=1;
+      while(st.length){
+        const p=st.pop(),x=p%sw,y=p/sw|0;
+        minX=Math.min(minX,x);minY=Math.min(minY,y);
+        maxX=Math.max(maxX,x);maxY=Math.max(maxY,y);
+        for(const[dX,dY]of[[1,0],[-1,0],[0,1],[0,-1]]){
+          const nx=x+dX,ny=y+dY,ni=ny*sw+nx;
+          if(nx>=0&&ny>=0&&nx<sw&&ny<sh&&edge[ni]&&!v[ni]){
+            v[ni]=1;st.push(ni);
+          }
+        }
+      }
+      const rw=maxX-minX,rh=maxY-minY;
+      if(rw>40&&Math.abs(rw-rh)<10)
+        createItem(minX,minY,rw,rh,scale);
+    }
+  }
+}
+
+// ---------- Item UI ----------
+function createItem(x,y,w,h,scale){
+  const c=document.createElement("canvas");
+  c.width=w/scale; c.height=h/scale;
+  c.getContext("2d").drawImage(srcCanvas,x/scale,y/scale,w/scale,h/scale,0,0,c.width,c.height);
+
+  const norm=normalize(c);
+  const hash=aHash(norm);
+  const itemName=identifyItem(hash);
+  const color=sampleFrameColor(c);
+  const rarity=identifyRarity(color);
+
+  const wrap=document.createElement("div");
+  wrap.className="item";
+  wrap.appendChild(c);
+
+  const label=document.createElement("div");
+  label.className="label";
+  label.textContent=`${itemName||"未登録"} / ${rarity||"?"} / OCR...`;
+  wrap.appendChild(label);
+
+  // OCRを非同期で（直列キュー）
+  enqueueOcr(async ()=>{
+    const digits = await ocrDigitsFromItem(c);
+    label.textContent = `${itemName||"未登録"} / ${rarity||"?"} / ${digits || "-"}`;
+  });
+
+  wrap.onclick=()=>{
+    const mode=prompt("1:アイテム登録  2:レアリティ色登録","");
+    if(mode==="1"){
+      const n=prompt("アイテム名",itemName||"");
+      if(n){itemDB[n]=hash;save();}
+    }
+    if(mode==="2"){
+      const r=prompt("レアリティ\n"+RARITIES.join(","),"");
+      if(RARITIES.includes(r)){
+        rarityDB[r]=color; save();
+      }
+    }
+    // 表示更新（OCR値は再実行しない。必要なら再OCRボタン化）
+    label.textContent=`${identifyItem(hash)||"未登録"} / ${identifyRarity(color)||"?"} / (keep)`;
+  };
+
+  result.appendChild(wrap);
+}
+
+// ---------- Save / View ----------
+function save(){
+  localStorage.setItem(ITEM_DB_KEY,JSON.stringify(itemDB));
+  localStorage.setItem(RARITY_DB_KEY,JSON.stringify(rarityDB));
+  updateDBView();
+}
+
+function updateDBView(){
+  dbview.textContent=JSON.stringify({items:itemDB,rarity:rarityDB},null,2);
+}
+</script>
+</body>
+</html>
