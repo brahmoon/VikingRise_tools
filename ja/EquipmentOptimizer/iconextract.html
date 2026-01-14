@@ -67,10 +67,42 @@ const ocrStatus = document.getElementById("ocrStatus");
 const ITEM_DB_KEY = "item_hash_db";
 const RARITY_DB_KEY = "rarity_color_db";
 
-const itemDB = JSON.parse(localStorage.getItem(ITEM_DB_KEY) || "{}");
-const rarityDB = JSON.parse(localStorage.getItem(RARITY_DB_KEY) || "{}");
+function loadDB(){
+  const storedItems  = localStorage.getItem(ITEM_DB_KEY);
+  const storedRarity = localStorage.getItem(RARITY_DB_KEY);
+
+  const itemDB = storedItems
+    ? JSON.parse(storedItems)
+    : structuredClone(DEFAULT_DB.items);
+
+  const rarityDB = storedRarity
+    ? JSON.parse(storedRarity)
+    : structuredClone(DEFAULT_DB.rarity);
+
+  return { itemDB, rarityDB };
+}
+
+const { itemDB, rarityDB } = loadDB();
 
 const RARITIES = ["Common","Uncommon","Rare","Epic","Legendary"];
+
+const DEFAULT_DB = {
+  items: {
+    "Wood": "0000000000001100001110000111000011110010110111001101100011111111",
+    "Rope": "0000011000111100010010001111010011110000000000001000000100011111",
+    "Fabric": "0000000000111100011111100111100101111000111100000000011111111111",
+    "Feather": "0000000000000111000101110001111101001111001000001100010011101111",
+    "Leather": "0111001111110000111110110001100001011001010000010000000000001111",
+    "Stone": "0000000000011110011111101111000001100000000010001000000010111111"
+  },
+  rarity: {
+    "Common":     { r:110.75, g:110,    b:110.16666666666667 },
+    "Uncommon":   { r:94.91666666666667, g:133.91666666666666, b:106.66666666666667 },
+    "Rare":       { r:78.83333333333333, g:96.75,  b:131.58333333333334 },
+    "Epic":       { r:105.75, g:97.66666666666667, b:136.5 },
+    "Legendary":  { r:135,    g:111.66666666666667, b:48.916666666666664 }
+  }
+};
 
 // ---- OCR: crop settings (tune here) ----
 // 右下を想定：幅40% 高さ28%、少し内側へ
@@ -100,14 +132,16 @@ async function ensureOcrWorker(){
   if (!ocrWorker) {
     ocrStatus.textContent = "OCR: loading...";
     ocrWorker = await Tesseract.createWorker({
-      logger: () => {} // 必要なら console.log に変更
+      logger: () => {}
     });
   }
+
+  // ★ これが無いと永遠に loading
+  await ocrWorker.load();
 
   await ocrWorker.loadLanguage("eng");
   await ocrWorker.initialize("eng");
 
-  // 数字だけ認識
   await ocrWorker.setParameters({
     tessedit_char_whitelist: "0123456789",
     tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE
@@ -116,6 +150,7 @@ async function ensureOcrWorker(){
   ocrReady = true;
   ocrStatus.textContent = "OCR: ready";
 }
+
 
 // キューで直列実行（同時実行すると重い/不安定になりがち）
 function enqueueOcr(task){
