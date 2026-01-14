@@ -131,14 +131,12 @@ async function ensureOcrWorker(){
 
   if (!ocrWorker) {
     ocrStatus.textContent = "OCR: loading...";
-    ocrWorker = await Tesseract.createWorker({
-      logger: () => {}
-    });
+    // logger を渡さない（←重要）
+    ocrWorker = await Tesseract.createWorker();
   }
 
-  // ★ これが無いと永遠に loading
+  // v5 では必須
   await ocrWorker.load();
-
   await ocrWorker.loadLanguage("eng");
   await ocrWorker.initialize("eng");
 
@@ -150,6 +148,7 @@ async function ensureOcrWorker(){
   ocrReady = true;
   ocrStatus.textContent = "OCR: ready";
 }
+
 
 
 // キューで直列実行（同時実行すると重い/不安定になりがち）
