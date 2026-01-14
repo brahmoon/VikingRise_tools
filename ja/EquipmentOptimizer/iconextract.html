@@ -14,6 +14,17 @@ canvas { border: 1px solid #aaa; }
   image-rendering: pixelated;
 }
 .label { font-size: 12px; white-space: nowrap; }
+.ocr-debug {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+.ocr-debug canvas {
+  width: 56px;
+  height: 56px;
+  border: 1px solid #bbb;
+  image-rendering: pixelated;
+}
 pre {
   background: #f5f5f5;
   padding: 10px;
@@ -117,6 +128,8 @@ const OCR_BIN_THRESHOLD = 170;
 
 // OCR判定を軽くする（小さすぎると精度低下するので注意）
 const OCR_RESIZE_W = 180; // OCR前に横幅をこれに拡大/縮小
+// 同一アイテムの共通領域をマスクする閾値（RGB差分合計）
+const COMMON_MASK_THRESHOLD = 18;
 // --------------------------------------
 
 updateDBView();
@@ -147,6 +160,98 @@ async function ensureOcrWorker(){
 
   ocrReady = true;
   ocrStatus.textContent = "OCR: ready";
+}
+
+// ---------- Item Group Masking ----------
+const itemGroups = new Map();
+const maskCache = new Map();
+
+function registerItemCanvas(itemName, canvas){
+  if (!itemName) return;
+  const list = itemGroups.get(itemName) || [];
+  list.push(canvas);
+  itemGroups.set(itemName, list);
+  maskCache.delete(itemName);
+}
+
+function buildCommonMaskData(canvases){
+  if (canvases.length < 2) return null;
+  const w = canvases[0].width;
+  const h = canvases[0].height;
+  for (const c of canvases) {
+    if (c.width !== w || c.height !== h) {
+      console.warn("Mask skip: canvas size mismatch", canvases);
+      return null;
+    }
+  }
+
+  const ctxList = canvases.map(c => c.getContext("2d"));
+  const imgList = ctxList.map(ctx => ctx.getImageData(0, 0, w, h).data);
+  const mask = new Uint8Array(w * h);
+
+  for (let i = 0; i < mask.length; i++) {
+    const baseIdx = i * 4;
+    const br = imgList[0][baseIdx];
+    const bg = imgList[0][baseIdx + 1];
+    const bb = imgList[0][baseIdx + 2];
+    let same = true;
+    for (let j = 1; j < imgList.length; j++) {
+      const d = imgList[j];
+      const dr = d[baseIdx];
+      const dg = d[baseIdx + 1];
+      const db = d[baseIdx + 2];
+      const diff = Math.abs(br - dr) + Math.abs(bg - dg) + Math.abs(bb - db);
+      if (diff > COMMON_MASK_THRESHOLD) {
+        same = false;
+        break;
+      }
+    }
+    mask[i] = same ? 1 : 0;
+  }
+  return { mask, width: w, height: h };
+}
+
+function getCommonMaskData(itemName){
+  if (!itemName) return null;
+  const canvases = itemGroups.get(itemName);
+  if (!canvases || canvases.length < 2) return null;
+
+  const cached = maskCache.get(itemName);
+  if (cached && cached.count === canvases.length) {
+    return cached.data;
+  }
+
+  const data = buildCommonMaskData(canvases);
+  if (data) {
+    maskCache.set(itemName, { count: canvases.length, data });
+  }
+  return data;
+}
+
+function applyCommonMask(itemCanvas, itemName){
+  const common = getCommonMaskData(itemName);
+  if (!common) return itemCanvas;
+
+  const c = document.createElement("canvas");
+  c.width = itemCanvas.width;
+  c.height = itemCanvas.height;
+  const ctx = c.getContext("2d");
+  ctx.drawImage(itemCanvas, 0, 0);
+
+  const img = ctx.getImageData(0, 0, c.width, c.height);
+  const d = img.data;
+  const mask = common.mask;
+  for (let i = 0; i < mask.length; i++) {
+    if (mask[i]) {
+      const idx = i * 4;
+      d[idx] = 0;
+      d[idx + 1] = 0;
+      d[idx + 2] = 0;
+      d[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return c;
 }
 
 
@@ -304,11 +409,23 @@ function cleanupDigits(text){
   return m.length ? m : null;
 }
 
-async function ocrDigitsFromItem(itemCanvas){
+function renderDebugCanvas(targetCanvas, sourceCanvas){
+  targetCanvas.width = sourceCanvas.width;
+  targetCanvas.height = sourceCanvas.height;
+  targetCanvas.getContext("2d").drawImage(sourceCanvas, 0, 0);
+}
+
+async function ocrDigitsFromItem(itemCanvas, itemName, debugTargets){
   await ensureOcrWorker();
 
-  const numArea = cropNumberArea(itemCanvas);
+  const masked = applyCommonMask(itemCanvas, itemName);
+  const numArea = cropNumberArea(masked);
   const bin = binarizeForOcr(numArea);
+
+  if (debugTargets) {
+    renderDebugCanvas(debugTargets.crop, numArea);
+    renderDebugCanvas(debugTargets.bin, bin);
+  }
 
   // tesseract.js は canvas をそのまま渡せる
   const { data } = await ocrWorker.recognize(bin);
@@ -373,6 +490,8 @@ function createItem(x,y,w,h,scale){
   const color=sampleFrameColor(c);
   const rarity=identifyRarity(color);
 
+  registerItemCanvas(itemName, c);
+
   const wrap=document.createElement("div");
   wrap.className="item";
   wrap.appendChild(c);
@@ -382,9 +501,20 @@ function createItem(x,y,w,h,scale){
   label.textContent=`${itemName||"未登録"} / ${rarity||"?"} / OCR...`;
   wrap.appendChild(label);
 
+  const debugWrap = document.createElement("div");
+  debugWrap.className = "ocr-debug";
+  const cropCanvas = document.createElement("canvas");
+  const binCanvas = document.createElement("canvas");
+  debugWrap.appendChild(cropCanvas);
+  debugWrap.appendChild(binCanvas);
+  wrap.appendChild(debugWrap);
+
   // OCRを非同期で（直列キュー）
   enqueueOcr(async ()=>{
-    const digits = await ocrDigitsFromItem(c);
+    const digits = await ocrDigitsFromItem(c, itemName, {
+      crop: cropCanvas,
+      bin: binCanvas
+    });
     label.textContent = `${itemName||"未登録"} / ${rarity||"?"} / ${digits || "-"}`;
   });
 
