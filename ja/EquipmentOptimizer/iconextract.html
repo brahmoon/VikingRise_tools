@@ -28,6 +28,27 @@ pre {
   border-radius: 999px;
   margin-left: 6px;
 }
+.debug-block {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.debug-title {
+  font-size: 12px;
+  opacity: 0.7;
+}
+#ocrDebug {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+#ocrDebug canvas {
+  border: 1px solid #bbb;
+  image-rendering: pixelated;
+  background: #fff;
+}
 .small {
   font-size: 11px;
   opacity: 0.75;
@@ -51,6 +72,22 @@ pre {
 <h3>検出アイテム</h3>
 <div id="result"></div>
 
+<h3>OCRデバッグ表示</h3>
+<div id="ocrDebug">
+  <div class="debug-block">
+    <div class="debug-title">crop</div>
+    <canvas id="ocrCrop"></canvas>
+  </div>
+  <div class="debug-block">
+    <div class="debug-title">bin</div>
+    <canvas id="ocrBin"></canvas>
+  </div>
+  <div class="debug-block">
+    <div class="debug-title">threshold</div>
+    <div id="ocrThreshold" class="badge">-</div>
+  </div>
+</div>
+
 <h3>登録DB（JSON）</h3>
 <pre id="dbview"></pre>
 
@@ -63,6 +100,9 @@ const srcCtx = srcCanvas.getContext("2d");
 const result = document.getElementById("result");
 const dbview = document.getElementById("dbview");
 const ocrStatus = document.getElementById("ocrStatus");
+const ocrCropCanvas = document.getElementById("ocrCrop");
+const ocrBinCanvas = document.getElementById("ocrBin");
+const ocrThresholdLabel = document.getElementById("ocrThreshold");
 
 const ITEM_DB_KEY = "item_hash_db";
 const RARITY_DB_KEY = "rarity_color_db";
@@ -105,18 +145,20 @@ const DEFAULT_DB = {
 };
 
 // ---- OCR: crop settings (tune here) ----
-// 右下を想定：幅40% 高さ28%、少し内側へ
+// 右下を想定：幅を少し広めに
 const OCR_CROP = {
-  x: 0.55,   // 左上X（0-1）
-  y: 0.68,   // 左上Y（0-1）
-  w: 0.42,   // 幅（0-1）
-  h: 0.28    // 高さ（0-1）
+  x: 0.52,   // 左上X（0-1）
+  y: 0.65,   // 左上Y（0-1）
+  w: 0.46,   // 幅（0-1）
+  h: 0.32    // 高さ（0-1）
 };
-// 二値化の閾値（数字が白系なら 150-210 あたりで調整）
-const OCR_BIN_THRESHOLD = 170;
+// 二値化の調整値（ローカル平均との差分）
+const OCR_BIN_OFFSET = 10;
+const OCR_BIN_WINDOW = 15; // 奇数推奨
 
 // OCR判定を軽くする（小さすぎると精度低下するので注意）
 const OCR_RESIZE_W = 180; // OCR前に横幅をこれに拡大/縮小
+const OCR_COMMON_VAR_THRESHOLD = 30;
 // --------------------------------------
 
 updateDBView();
@@ -271,9 +313,9 @@ function cropNumberArea(itemCanvas){
   return c;
 }
 
-function binarizeForOcr(canvas){
-  // 1) サイズ正規化（OCRしやすく）
-  const w = canvas.width, h = canvas.height;
+function prepareOcrCanvas(itemCanvas){
+  const crop = cropNumberArea(itemCanvas);
+  const w = crop.width, h = crop.height;
   const scale = OCR_RESIZE_W / w;
   const tw = OCR_RESIZE_W;
   const th = Math.max(1, Math.floor(h * scale));
@@ -282,19 +324,120 @@ function binarizeForOcr(canvas){
   c.width = tw;
   c.height = th;
   const ctx = c.getContext("2d");
-  ctx.drawImage(canvas, 0, 0, tw, th);
+  ctx.drawImage(crop, 0, 0, tw, th);
 
-  // 2) 二値化
   const img = ctx.getImageData(0,0,tw,th);
   const d = img.data;
+  const gray = new Uint8Array(tw * th);
+  let min = 255;
+  let max = 0;
   for(let i=0;i<d.length;i+=4){
     const g = (d[i]+d[i+1]+d[i+2]) / 3;
-    const v = (g > OCR_BIN_THRESHOLD) ? 255 : 0;
-    d[i]=d[i+1]=d[i+2]=v;
-    d[i+3]=255;
+    const gv = g | 0;
+    gray[i/4] = gv;
+    if (gv < min) min = gv;
+    if (gv > max) max = gv;
+  }
+  const range = Math.max(1, max - min);
+  for (let i = 0; i < gray.length; i++) {
+    gray[i] = ((gray[i] - min) * 255 / range) | 0;
+  }
+
+  return { canvas: c, gray, width: tw, height: th };
+}
+
+function binarizeFromGray(gray, w, h){
+  const bin = adaptiveThreshold(gray, w, h, OCR_BIN_WINDOW, OCR_BIN_OFFSET);
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d");
+  const img = ctx.createImageData(w, h);
+  const d = img.data;
+  for(let i=0;i<bin.length;i++){
+    const v = bin[i];
+    const p = i * 4;
+    d[p]=d[p+1]=d[p+2]=v;
+    d[p+3]=255;
   }
   ctx.putImageData(img,0,0);
+  return { canvas: c, threshold: `adaptive(${OCR_BIN_WINDOW},-${OCR_BIN_OFFSET})` };
+}
 
+function adaptiveThreshold(gray, w, h, windowSize, offset){
+  const size = windowSize | 0;
+  const half = Math.max(1, size >> 1);
+  const integral = new Uint32Array((w + 1) * (h + 1));
+  for (let y = 1; y <= h; y++) {
+    let rowSum = 0;
+    for (let x = 1; x <= w; x++) {
+      const idx = (y - 1) * w + (x - 1);
+      rowSum += gray[idx];
+      integral[y * (w + 1) + x] = integral[(y - 1) * (w + 1) + x] + rowSum;
+    }
+  }
+  const out = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const y1 = Math.max(0, y - half);
+    const y2 = Math.min(h - 1, y + half);
+    for (let x = 0; x < w; x++) {
+      const x1 = Math.max(0, x - half);
+      const x2 = Math.min(w - 1, x + half);
+      const A = integral[y1 * (w + 1) + x1];
+      const B = integral[y1 * (w + 1) + (x2 + 1)];
+      const C = integral[(y2 + 1) * (w + 1) + x1];
+      const D = integral[(y2 + 1) * (w + 1) + (x2 + 1)];
+      const area = (x2 - x1 + 1) * (y2 - y1 + 1);
+      const mean = (D - B - C + A) / area;
+      const idx = y * w + x;
+      out[idx] = gray[idx] > (mean - offset) ? 255 : 0;
+    }
+  }
+  return out;
+}
+
+function computeCommonMask(grays, w, h){
+  const count = grays.length;
+  const sum = new Uint32Array(w * h);
+  const sumSq = new Uint32Array(w * h);
+  for (const g of grays) {
+    for (let i = 0; i < g.length; i++) {
+      const v = g[i];
+      sum[i] += v;
+      sumSq[i] += v * v;
+    }
+  }
+  const mask = new Uint8Array(w * h);
+  for (let i = 0; i < mask.length; i++) {
+    const mean = sum[i] / count;
+    const variance = (sumSq[i] / count) - (mean * mean);
+    mask[i] = variance < OCR_COMMON_VAR_THRESHOLD ? 1 : 0;
+  }
+  return mask;
+}
+
+function applyMask(gray, mask){
+  const out = new Uint8Array(gray.length);
+  for (let i = 0; i < gray.length; i++) {
+    out[i] = mask[i] ? 255 : gray[i];
+  }
+  return out;
+}
+
+function grayToCanvas(gray, w, h){
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d");
+  const img = ctx.createImageData(w, h);
+  const d = img.data;
+  for (let i = 0; i < gray.length; i++) {
+    const v = gray[i];
+    const p = i * 4;
+    d[p] = d[p + 1] = d[p + 2] = v;
+    d[p + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
   return c;
 }
 
@@ -304,20 +447,34 @@ function cleanupDigits(text){
   return m.length ? m : null;
 }
 
-async function ocrDigitsFromItem(itemCanvas){
+async function ocrDigitsFromItem(maskedGray, w, h){
   await ensureOcrWorker();
+  const maskedCanvas = grayToCanvas(maskedGray, w, h);
+  const { canvas: bin, threshold } = binarizeFromGray(maskedGray, w, h);
+  updateOcrDebug(maskedCanvas, bin, threshold);
 
-  const numArea = cropNumberArea(itemCanvas);
-  const bin = binarizeForOcr(numArea);
-
-  // tesseract.js は canvas をそのまま渡せる
   const { data } = await ocrWorker.recognize(bin);
   return cleanupDigits(data.text);
+}
+
+function updateOcrDebug(cropCanvas, binCanvas, threshold){
+  drawDebugCanvas(ocrCropCanvas, cropCanvas);
+  drawDebugCanvas(ocrBinCanvas, binCanvas);
+  ocrThresholdLabel.textContent = threshold;
+}
+
+function drawDebugCanvas(target, source){
+  const ctx = target.getContext("2d");
+  target.width = source.width;
+  target.height = source.height;
+  ctx.clearRect(0, 0, target.width, target.height);
+  ctx.drawImage(source, 0, 0);
 }
 
 // ---------- Frame Detection ----------
 function detectFrames(){
   result.innerHTML="";
+  itemsForOcr = [];
   const w=srcCanvas.width,h=srcCanvas.height;
   const scale=0.5;
   const sw=w*scale|0,sh=h*scale|0;
@@ -359,6 +516,7 @@ function detectFrames(){
         createItem(minX,minY,rw,rh,scale);
     }
   }
+  runOcrForGroups();
 }
 
 // ---------- Item UI ----------
@@ -382,12 +540,6 @@ function createItem(x,y,w,h,scale){
   label.textContent=`${itemName||"未登録"} / ${rarity||"?"} / OCR...`;
   wrap.appendChild(label);
 
-  // OCRを非同期で（直列キュー）
-  enqueueOcr(async ()=>{
-    const digits = await ocrDigitsFromItem(c);
-    label.textContent = `${itemName||"未登録"} / ${rarity||"?"} / ${digits || "-"}`;
-  });
-
   wrap.onclick=()=>{
     const mode=prompt("1:アイテム登録  2:レアリティ色登録","");
     if(mode==="1"){
@@ -405,6 +557,36 @@ function createItem(x,y,w,h,scale){
   };
 
   result.appendChild(wrap);
+  itemsForOcr.push({ canvas: c, label, itemName, hash, rarity });
+}
+
+let itemsForOcr = [];
+
+function runOcrForGroups(){
+  const groups = new Map();
+  for (const item of itemsForOcr) {
+    const key = item.itemName || item.hash || "unknown";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+
+  for (const group of groups.values()) {
+    if (group.length === 0) continue;
+    const prepared = group.map(item => ({ item, ...prepareOcrCanvas(item.canvas) }));
+    const w = prepared[0].width;
+    const h = prepared[0].height;
+    const grays = prepared.map(p => p.gray);
+    const mask = computeCommonMask(grays, w, h);
+
+    for (const entry of prepared) {
+      const maskedGray = applyMask(entry.gray, mask);
+      enqueueOcr(async () => {
+        const digits = await ocrDigitsFromItem(maskedGray, w, h);
+        const { item } = entry;
+        item.label.textContent = `${item.itemName||"未登録"} / ${item.rarity||"?"} / ${digits || "-"}`;
+      });
+    }
+  }
 }
 
 // ---------- Save / View ----------
