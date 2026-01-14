@@ -568,7 +568,11 @@ function detectFrames(){
         }
       }
       const rw=maxX-minX,rh=maxY-minY;
-      if(rw>40&&Math.abs(rw-rh)<10)
+      const minSize = Math.min(sw, sh) * 0.08; // 画面短辺の8%
+      const maxSize = Math.min(sw, sh) * 0.35;
+
+      if (rw > minSize && rw < maxSize && Math.abs(rw - rh) < rw * 0.15)
+
         createItem(minX,minY,rw,rh,scale);
     }
   }
