@@ -28,6 +28,27 @@ pre {
   border-radius: 999px;
   margin-left: 6px;
 }
+.debug-block {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.debug-title {
+  font-size: 12px;
+  opacity: 0.7;
+}
+#ocrDebug {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+#ocrDebug canvas {
+  border: 1px solid #bbb;
+  image-rendering: pixelated;
+  background: #fff;
+}
 .small {
   font-size: 11px;
   opacity: 0.75;
@@ -51,6 +72,22 @@ pre {
 <h3>検出アイテム</h3>
 <div id="result"></div>
 
+<h3>OCRデバッグ表示</h3>
+<div id="ocrDebug">
+  <div class="debug-block">
+    <div class="debug-title">crop</div>
+    <canvas id="ocrCrop"></canvas>
+  </div>
+  <div class="debug-block">
+    <div class="debug-title">bin</div>
+    <canvas id="ocrBin"></canvas>
+  </div>
+  <div class="debug-block">
+    <div class="debug-title">threshold</div>
+    <div id="ocrThreshold" class="badge">-</div>
+  </div>
+</div>
+
 <h3>登録DB（JSON）</h3>
 <pre id="dbview"></pre>
 
@@ -63,6 +100,9 @@ const srcCtx = srcCanvas.getContext("2d");
 const result = document.getElementById("result");
 const dbview = document.getElementById("dbview");
 const ocrStatus = document.getElementById("ocrStatus");
+const ocrCropCanvas = document.getElementById("ocrCrop");
+const ocrBinCanvas = document.getElementById("ocrBin");
+const ocrThresholdLabel = document.getElementById("ocrThreshold");
 
 const ITEM_DB_KEY = "item_hash_db";
 const RARITY_DB_KEY = "rarity_color_db";
@@ -105,12 +145,12 @@ const DEFAULT_DB = {
 };
 
 // ---- OCR: crop settings (tune here) ----
-// 右下を想定：幅40% 高さ28%、少し内側へ
+// 右下を想定：幅を少し広めに
 const OCR_CROP = {
-  x: 0.55,   // 左上X（0-1）
-  y: 0.68,   // 左上Y（0-1）
-  w: 0.42,   // 幅（0-1）
-  h: 0.28    // 高さ（0-1）
+  x: 0.52,   // 左上X（0-1）
+  y: 0.65,   // 左上Y（0-1）
+  w: 0.46,   // 幅（0-1）
+  h: 0.32    // 高さ（0-1）
 };
 // 二値化の閾値（数字が白系なら 150-210 あたりで調整）
 const OCR_BIN_THRESHOLD = 170;
@@ -287,15 +327,51 @@ function binarizeForOcr(canvas){
   // 2) 二値化
   const img = ctx.getImageData(0,0,tw,th);
   const d = img.data;
+  const threshold = calcOtsuThreshold(d) ?? OCR_BIN_THRESHOLD;
   for(let i=0;i<d.length;i+=4){
     const g = (d[i]+d[i+1]+d[i+2]) / 3;
-    const v = (g > OCR_BIN_THRESHOLD) ? 255 : 0;
+    const v = (g > threshold) ? 255 : 0;
     d[i]=d[i+1]=d[i+2]=v;
     d[i+3]=255;
   }
   ctx.putImageData(img,0,0);
 
-  return c;
+  return { canvas: c, threshold };
+}
+
+function calcOtsuThreshold(data){
+  const hist = new Uint32Array(256);
+  let total = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const g = ((data[i] + data[i + 1] + data[i + 2]) / 3) | 0;
+    hist[g]++;
+    total++;
+  }
+  if (!total) return null;
+
+  let sum = 0;
+  for (let i = 0; i < 256; i++) sum += i * hist[i];
+
+  let sumB = 0;
+  let wB = 0;
+  let maxVar = -1;
+  let threshold = null;
+
+  for (let i = 0; i < 256; i++) {
+    wB += hist[i];
+    if (wB === 0) continue;
+    const wF = total - wB;
+    if (wF === 0) break;
+    sumB += i * hist[i];
+    const mB = sumB / wB;
+    const mF = (sum - sumB) / wF;
+    const between = wB * wF * (mB - mF) * (mB - mF);
+    if (between > maxVar) {
+      maxVar = between;
+      threshold = i;
+    }
+  }
+  return threshold;
 }
 
 function cleanupDigits(text){
@@ -308,11 +384,26 @@ async function ocrDigitsFromItem(itemCanvas){
   await ensureOcrWorker();
 
   const numArea = cropNumberArea(itemCanvas);
-  const bin = binarizeForOcr(numArea);
+  const { canvas: bin, threshold } = binarizeForOcr(numArea);
+  updateOcrDebug(numArea, bin, threshold);
 
   // tesseract.js は canvas をそのまま渡せる
   const { data } = await ocrWorker.recognize(bin);
   return cleanupDigits(data.text);
+}
+
+function updateOcrDebug(cropCanvas, binCanvas, threshold){
+  drawDebugCanvas(ocrCropCanvas, cropCanvas);
+  drawDebugCanvas(ocrBinCanvas, binCanvas);
+  ocrThresholdLabel.textContent = threshold ?? OCR_BIN_THRESHOLD;
+}
+
+function drawDebugCanvas(target, source){
+  const ctx = target.getContext("2d");
+  target.width = source.width;
+  target.height = source.height;
+  ctx.clearRect(0, 0, target.width, target.height);
+  ctx.drawImage(source, 0, 0);
 }
 
 // ---------- Frame Detection ----------
