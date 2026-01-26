@@ -493,7 +493,7 @@ fileInput.onchange = e => {
   fileInput.value = "";
 };
 
-window.addEventListener("paste", e => {
+document.addEventListener("paste", e => {
   const items = e.clipboardData?.items || [];
   for (const item of items) {
     if (item.kind === "file" && item.type.startsWith("image")) {
