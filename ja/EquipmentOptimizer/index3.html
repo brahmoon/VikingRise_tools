@@ -479,25 +479,44 @@ function enqueueOcr(task){
 }
 
 // ---------- Image Load ----------
-document.getElementById("file").onchange = e => {
-  loadImage(URL.createObjectURL(e.target.files[0]));
+const fileInput = document.getElementById("file");
+
+function loadImageFromFile(file) {
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  loadImage(url, () => URL.revokeObjectURL(url));
+}
+
+fileInput.onchange = e => {
+  const file = e.target.files && e.target.files[0];
+  loadImageFromFile(file);
+  fileInput.value = "";
 };
 
-document.addEventListener("paste", e => {
-  for (const item of e.clipboardData.items) {
-    if (item.type.startsWith("image")) {
-      loadImage(URL.createObjectURL(item.getAsFile()));
+window.addEventListener("paste", e => {
+  const items = e.clipboardData?.items || [];
+  for (const item of items) {
+    if (item.kind === "file" && item.type.startsWith("image")) {
+      loadImageFromFile(item.getAsFile());
+      e.preventDefault();
+      return;
     }
+  }
+  const files = e.clipboardData?.files || [];
+  if (files.length && files[0].type.startsWith("image")) {
+    loadImageFromFile(files[0]);
+    e.preventDefault();
   }
 });
 
-function loadImage(url){
+function loadImage(url, onLoadCleanup){
   const img=new Image();
   img.onload=()=>{
     srcCanvas.width=img.width;
     srcCanvas.height=img.height;
     srcCtx.drawImage(img,0,0);
     detectFrames();
+    if (onLoadCleanup) onLoadCleanup();
   };
   img.src=url;
 }
@@ -1071,10 +1090,6 @@ async function calculate() {
   const lp = { name:'EquipOptimization', objective:{ direction: glpk.GLP_MAX, name:'total', vars:[] }, subjectTo:[] };
   equipNames.forEach(r => lp.objective.vars.push({ name:r, coef:1 }));
 
-  if (!_0x4c7d()) return;
-  const isValid = await _0x4f7b();
-  if (!isValid) return;
-  
   ['木','紐','布','羽','皮','石'].forEach(mat => {
     const cons = { name: mat, vars: [], bnds:{ type: glpk.GLP_UP, ub: stock[mat], lb:0 } };
     equipNames.forEach(r => {
@@ -1115,11 +1130,6 @@ async function calculate() {
 }
 
   document.addEventListener('DOMContentLoaded', async function() {
-    const isValid = await _0x4f7b();
-    if (!isValid) {
-      return;
-    }
-  
   document.getElementById('calculateBtn').addEventListener('click', calculate);
   showRecipeTable();
 });
