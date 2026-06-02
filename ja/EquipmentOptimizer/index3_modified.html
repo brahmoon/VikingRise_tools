@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OCR連携 装備最適化ツール</title>
+<script src="https://brahmoon.github.io/VikingRise_tools/modules/QueryLogger/query-logger.js"></script>
+<style>
+body { font-family: sans-serif; padding: 20px; margin:0; box-sizing:border-box; }
+.wrapper { width: 100%; max-width: 100%; overflow-x: auto; }
+.stock-container { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.material-block {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 8px;
+  min-width: 260px;
+}
+.material-name {
+  display: flex;
+}
+.material-block strong {
+  display: block;
+  margin-bottom: 4px;
+  margin-left: 8px;
+}
+.material-block input {
+  width: 55px;
+  margin: 2px 3px;
+}
+table { border: 1px solid #ccc; border-collapse: collapse; width: 100%; max-width: 100%; }
+th, td { border: 1px solid #ccc; padding: 5px; text-align: center; }
+th { background-color: #f0f0f0; }
+tr.highlight { background-color: #f9f9e5; }
+.count-box { width: 40px; text-align: center; }
+button.small-btn { padding: 2px 6px; margin: 0 2px; }
+@media (max-width: 600px) {
+  .stock-container { flex-direction: column; }
+  .material-block { min-width: 100%; }
+  input { width: 50px; }
+  table { font-size: 12px; }
+}
+
+canvas { border: 1px solid #aaa; }
+#result { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; }
+.item { text-align: center; cursor: pointer; }
+.item canvas {
+  width: 64px; height: 64px;
+  border: 1px solid #666;
+  image-rendering: pixelated;
+}
+.label { font-size: 12px; white-space: nowrap; }
+.ocr-debug {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+.ocr-debug canvas {
+  width: 56px;
+  height: 56px;
+  border: 1px solid #bbb;
+  image-rendering: pixelated;
+}
+pre {
+  background: #f5f5f5;
+  padding: 10px;
+  max-height: 300px;
+  overflow: auto;
+}
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  padding: 2px 6px;
+  border: 1px solid #ccc;
+  border-radius: 999px;
+  margin-left: 6px;
+}
+.small {
+  font-size: 11px;
+  opacity: 0.75;
+}
+.controls {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fafafa;
+  font-size: 12px;
+}
+.controls .row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.controls label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.controls input {
+  width: 80px;
+}
+</style>
+</head>
+<body>
+<div class="wrapper">
+<h2>OCR連携 装備最適化ツール</h2>
+
+<h3>アイテム画像から数量を取得</h3>
+<input type="file" id="file" accept="image/*">
+<p>または Ctrl+V で画像貼り付け</p>
+
+<div class="small">
+  OCR初回はWASM読込で少し時間がかかります。数量領域が合わない場合は下の「OCR切り出し設定」を調整してください。
+  <span id="ocrStatus" class="badge">OCR: not loaded</span>
+</div>
+
+<div class="controls">
+  <div><strong>OCR切り出し設定</strong>（変更すると即時に再OCR）</div>
+  <div class="row">
+    <label>Crop X <input type="number" step="0.01" min="0" max="1" id="ocrCropX"></label>
+    <label>Crop Y <input type="number" step="0.01" min="0" max="1" id="ocrCropY"></label>
+    <label>Crop W <input type="number" step="0.01" min="0.05" max="1" id="ocrCropW"></label>
+    <label>Crop H <input type="number" step="0.01" min="0.05" max="1" id="ocrCropH"></label>
+  </div>
+  <div class="row">
+    <label>二値化閾値 <input type="number" step="1" min="0" max="255" id="ocrBinThreshold"></label>
+    <label>OCRリサイズ幅 <input type="number" step="1" min="40" max="512" id="ocrResizeW"></label>
+    <label>共通マスク閾値 <input type="number" step="1" min="0" max="255" id="ocrMaskThreshold"></label>
+  </div>
+</div>
+
+<canvas id="src"></canvas>
+
+<h3>検出アイテム</h3>
+<div id="result"></div>
+
+<h3>登録DB（JSON）</h3>
+<pre id="dbview"></pre>
+
+<h3>所持素材数を入力</h3>
+<div class="stock-container">
+  <div class="material-block">
+    <div class="material-name">
+      <img src="img/wood.png" width="27" height="27">
+      <strong>木</strong>
+    </div>
+    <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_wood_common" value="" min="0">
+    <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_wood_uncommon" value="" min="0">
+    <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_wood_rare" value="" min="0">
+    <span style="background-color:#c8b3e6">紫</span>: <input type="number" id="stock_wood_epic" value="" min="0">
+    <span style="background-color:#e8d687">金</span>: <input type="number" id="stock_wood_legend" value="" min="0">
+  </div>
+  <div class="material-block">
+    <div class="material-name">
+      <img src="img/rope.png" width="27" height="27">
+      <strong>紐</strong>
+    </div>
+    <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_rope_common" value="" min="0">
+    <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_rope_uncommon" value="" min="0">
+    <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_rope_rare" value="" min="0">
+    <span style="background-color:#c8b3e6">紫</span>: <input type="number" id="stock_rope_epic" value="" min="0">
+    <span style="background-color:#e8d687">金</span>: <input type="number" id="stock_rope_legend" value="" min="0">
+  </div>
+  <div class="material-block">
+    <div class="material-name">
+      <img src="img/cloth.png" width="27" height="27">
+      <strong>布</strong>
+    </div>
+    <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_cloth_common" value="" min="0">
+    <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_cloth_uncommon" value="" min="0">
+    <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_cloth_rare" value="" min="0">
+    <span style="background-color:#c8b3e6">紫</span>: <input type="number" id="stock_cloth_epic" value="" min="0">
+    <span style="background-color:#e8d687">金</span>: <input type="number" id="stock_cloth_legend" value="" min="0">
+  </div>
+  <div class="material-block">
+    <div class="material-name">
+      <img src="img/feather.png" width="27" height="27">
+      <strong>羽</strong>
+    </div>
+    <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_feather_common" value="" min="0">
+    <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_feather_uncommon" value="" min="0">
+    <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_feather_rare" value="" min="0">
+    <span style="background-color:#c8b3e6">紫</span>: <input type="number" id="stock_feather_epic" value="" min="0">
+    <span style="background-color:#e8d687">金</span>: <input type="number" id="stock_feather_legend" value="" min="0">
+  </div>
+  <div class="material-block">
+    <div class="material-name">
+      <img src="img/leather.png" width="27" height="27">
+      <strong>皮</strong>
+    </div>
+    <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_leather_common" value="" min="0">
+    <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_leather_uncommon" value="" min="0">
+    <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_leather_rare" value="" min="0">
+    <span style="background-color:#c8b3e6">紫</span>: <input type="number" id="stock_leather_epic" value="" min="0">
+    <span style="background-color:#e8d687">金</span>: <input type="number" id="stock_leather_legend" value="" min="0">
+  </div>
+  <div class="material-block">
+    <div class="material-name">
+      <img src="img/stone.png" width="27" height="27">
+      <strong>石</strong>
+    </div>
+    <span style="background-color:#dddddd">白</span>: <input type="number" id="stock_stone_common" value="" min="0">
+    <span style="background-color:#a4dba5">緑</span>: <input type="number" id="stock_stone_uncommon" value="" min="0">
+    <span style="background-color:#a8ceff">青</span>: <input type="number" id="stock_stone_rare" value="" min="0">
+    <span style="background-color:#c8b3e6">紫</span>: <input type="number" id="stock_stone_epic" value="" min="0">
+    <span style="background-color:#e8d687">金</span>: <input type="number" id="stock_stone_legend" value="" min="0">
+  </div>
+</div>
+
+<button id="calculateBtn">計算</button>
+<div id="calculate_msg"></span>
+
+<h3>装備一覧（青基準 → 白換算表示）</h3>
+<table id="recipe_table">
+<tr>
+  <th>装備（青）</th>
+  <th>木</th>
+  <th>紐</th>
+  <th>布</th>
+  <th>羽</th>
+  <th>皮</th>
+  <th>石</th>
+  <th>作成回数（計算）</th>
+  <th>作成カウント</th>
+</tr>
+</table>
+
+<h3>余った素材（白換算）</h3>
+<ul id="leftover_list"></ul>
+
+<h3>作成可能な合計数</h3>
+<div id="total_possible">0</div>
+
+</div>
+
+<!-- tesseract.js (WASM) -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script type="module">
+  document.addEventListener('DOMContentLoaded', async () => {
+    if (typeof exec_sendData === 'function') {
+      try { await exec_sendData(); } catch(e) { console.warn('QueryLogger skipped', e); }
+    }
+  });
+
+import GLPK from "./lib/index.js";
+
+// ============================================================
+// Canvas / UI references
+// ============================================================
+const srcCanvas = document.getElementById("src");
+const srcCtx = srcCanvas.getContext("2d", { willReadFrequently: true });
+const result = document.getElementById("result");
+const dbview = document.getElementById("dbview");
+const ocrStatus = document.getElementById("ocrStatus");
+const ocrCropX = document.getElementById("ocrCropX");
+const ocrCropY = document.getElementById("ocrCropY");
+const ocrCropW = document.getElementById("ocrCropW");
+const ocrCropH = document.getElementById("ocrCropH");
+const ocrBinThreshold = document.getElementById("ocrBinThreshold");
+const ocrResizeW = document.getElementById("ocrResizeW");
+const ocrMaskThreshold = document.getElementById("ocrMaskThreshold");
+
+// 既存HTMLに追加設定を動的に足す。HTML側を大きく崩さないため。
+const extraControls = document.createElement("div");
+extraControls.className = "row";
+extraControls.innerHTML = `
+  <label>グレード色X <input type="number" step="0.01" min="0" max="1" id="raritySampleX"></label>
+  <label>グレード色Y <input type="number" step="0.01" min="0" max="1" id="raritySampleY"></label>
+  <label>色サンプル半径 <input type="number" step="1" min="1" max="12" id="raritySampleRadius"></label>
+  <label>アイコン差分閾値 <input type="number" step="1" min="0" max="255" id="templateDiffThreshold"></label>
+  <label>最小差分px <input type="number" step="1" min="1" max="2000" id="minDiffPixels"></label>
+  <button type="button" id="clearTemplateBtn">登録テンプレ削除</button>
+`;
+document.querySelector(".controls").appendChild(extraControls);
+
+const raritySampleX = document.getElementById("raritySampleX");
+const raritySampleY = document.getElementById("raritySampleY");
+const raritySampleRadius = document.getElementById("raritySampleRadius");
+const templateDiffThreshold = document.getElementById("templateDiffThreshold");
+const minDiffPixels = document.getElementById("minDiffPixels");
+const clearTemplateBtn = document.getElementById("clearTemplateBtn");
+
+// ============================================================
+// DB / settings
+// ============================================================
+const ITEM_DB_KEY = "item_hash_db";
+const RARITY_DB_KEY = "rarity_color_db";
+const TEMPLATE_DB_KEY = "item_grade_template_db_v2";
+
+const DEFAULT_DB = {
+  items: {
+    "Wood": "0000000000001100001110000111000011110010110111001101100011111111",
+    "Rope": "0000011000111100010010001111010011110000000000001000000100011111",
+    "Fabric": "0000000000111100011111100111100101111000111100000000011111111111",
+    "Feather": "0000000000000111000101110001111101001111001000001100010011101111",
+    "Leather": "0111001111110000111110110001100001011001010000010000000000001111",
+    "Stone": "0000000000011110011111101111000001100000000010001000000010111111"
+  },
+  rarity: {
+    "Common":     { r:110.75, g:110,    b:110.16666666666667 },
+    "Uncommon":   { r:94.91666666666667, g:133.91666666666666, b:106.66666666666667 },
+    "Rare":       { r:78.83333333333333, g:96.75,  b:131.58333333333334 },
+    "Epic":       { r:105.75, g:97.66666666666667, b:136.5 },
+    "Legendary":  { r:135,    g:111.66666666666667, b:48.916666666666664 }
+  },
+  templates: []
+};
+
+const RARITIES = ["Common", "Uncommon", "Rare", "Epic", "Legendary"];
+
+const OCR_SETTINGS = {
+  // テンプレ差分が使えない時の保険。右下数量を固定切り出し。
+  crop: { x: 0.30, y: 0.68, w: 0.62, h: 0.28 },
+  binThreshold: 175,
+  resizeW: 220,
+
+  // 同一アイテム・同一グレードの登録アイコンとの差分抽出用。
+  templateDiffThreshold: 42, // RGB合計差分がこれ以上なら「変化あり」
+  minDiffPixels: 12,
+  diffBoxPadding: 4,
+
+  // グレード判定用の指定座標。初期値は左上寄りの枠/背景色を想定。
+  raritySample: { x: 0.12, y: 0.12, radius: 3 },
+
+  // 旧UIの名前を残す。現在はテンプレ差分の補助に使う。
+  maskThreshold: 18
+};
+
+function safeJsonParse(text, fallback){
+  try { return text ? JSON.parse(text) : fallback; }
+  catch(e) { console.warn('Invalid stored JSON; fallback used', e); return fallback; }
+}
+
+function structuredCloneSafe(obj){
+  return JSON.parse(JSON.stringify(obj));
+}
+
+function loadDB(){
+  return {
+    itemDB: safeJsonParse(localStorage.getItem(ITEM_DB_KEY), structuredCloneSafe(DEFAULT_DB.items)),
+    rarityDB: safeJsonParse(localStorage.getItem(RARITY_DB_KEY), structuredCloneSafe(DEFAULT_DB.rarity)),
+    templateDB: safeJsonParse(localStorage.getItem(TEMPLATE_DB_KEY), structuredCloneSafe(DEFAULT_DB.templates))
+  };
+}
+
+const { itemDB, rarityDB, templateDB } = loadDB();
+const templateCanvasCache = new Map();
+
+function save(){
+  localStorage.setItem(ITEM_DB_KEY, JSON.stringify(itemDB));
+  localStorage.setItem(RARITY_DB_KEY, JSON.stringify(rarityDB));
+  localStorage.setItem(TEMPLATE_DB_KEY, JSON.stringify(templateDB));
+  templateCanvasCache.clear();
+  updateDBView();
+}
+
+function updateDBView(){
+  const view = {
+    items: itemDB,
+    rarity: rarityDB,
+    templates: templateDB.map(t => ({
+      itemName: t.itemName,
+      rarity: t.rarity,
+      width: t.width,
+      height: t.height,
+      createdAt: t.createdAt
+    }))
+  };
+  dbview.textContent = JSON.stringify(view, null, 2);
+}
+
+// ============================================================
+// OCR Worker
+// ============================================================
+let ocrWorker = null;
+let ocrReady = false;
+let ocrQueue = Promise.resolve();
+
+async function ensureOcrWorker(){
+  if (ocrReady) return;
+  if (!ocrWorker) {
+    ocrStatus.textContent = "OCR: loading...";
+    ocrWorker = await Tesseract.createWorker();
+  }
+  await ocrWorker.load();
+  await ocrWorker.loadLanguage("eng");
+  await ocrWorker.initialize("eng");
+  await ocrWorker.setParameters({
+    tessedit_char_whitelist: "0123456789",
+    tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE
+  });
+  ocrReady = true;
+  ocrStatus.textContent = "OCR: ready";
+}
+
+function enqueueOcr(task){
+  ocrQueue = ocrQueue.then(task).catch(err => {
+    console.error(err);
+    ocrStatus.textContent = "OCR: error";
+  });
+  return ocrQueue;
+}
+
+// ============================================================
+// Generic helpers
+// ============================================================
+function clamp(value, min, max){
+  return Math.min(Math.max(value, min), max);
+}
+
+function canvasToDataUrl(canvas){
+  return canvas.toDataURL("image/png");
+}
+
+function copyCanvas(canvas){
+  const c = document.createElement("canvas");
+  c.width = canvas.width;
+  c.height = canvas.height;
+  c.getContext("2d", { willReadFrequently: true }).drawImage(canvas, 0, 0);
+  return c;
+}
+
+function loadCanvasFromDataUrl(dataUrl){
+  if (templateCanvasCache.has(dataUrl)) return Promise.resolve(templateCanvasCache.get(dataUrl));
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement("canvas");
+      c.width = img.width;
+      c.height = img.height;
+      c.getContext("2d", { willReadFrequently: true }).drawImage(img, 0, 0);
+      templateCanvasCache.set(dataUrl, c);
+      resolve(c);
+    };
+    img.onerror = reject;
+    img.src = dataUrl;
+  });
+}
+
+function resizeCanvas(source, width, height){
+  const c = document.createElement("canvas");
+  c.width = width;
+  c.height = height;
+  c.getContext("2d", { willReadFrequently: true }).drawImage(source, 0, 0, width, height);
+  return c;
+}
+
+function cleanupDigits(text){
+  const m = (text || "").replace(/[^\d]/g, "");
+  return m.length ? m : null;
+}
+
+function renderDebugCanvas(targetCanvas, sourceCanvas){
+  targetCanvas.width = sourceCanvas.width;
+  targetCanvas.height = sourceCanvas.height;
+  targetCanvas.getContext("2d").drawImage(sourceCanvas, 0, 0);
+}
+
+// ============================================================
+// Controls
+// ============================================================
+function syncOcrControls(){
+  ocrCropX.value = OCR_SETTINGS.crop.x;
+  ocrCropY.value = OCR_SETTINGS.crop.y;
+  ocrCropW.value = OCR_SETTINGS.crop.w;
+  ocrCropH.value = OCR_SETTINGS.crop.h;
+  ocrBinThreshold.value = OCR_SETTINGS.binThreshold;
+  ocrResizeW.value = OCR_SETTINGS.resizeW;
+  ocrMaskThreshold.value = OCR_SETTINGS.maskThreshold;
+  raritySampleX.value = OCR_SETTINGS.raritySample.x;
+  raritySampleY.value = OCR_SETTINGS.raritySample.y;
+  raritySampleRadius.value = OCR_SETTINGS.raritySample.radius;
+  templateDiffThreshold.value = OCR_SETTINGS.templateDiffThreshold;
+  minDiffPixels.value = OCR_SETTINGS.minDiffPixels;
+}
+
+function attachOcrControlEvents(){
+  const onChange = () => {
+    OCR_SETTINGS.crop.x = clamp(parseFloat(ocrCropX.value) || 0, 0, 1);
+    OCR_SETTINGS.crop.y = clamp(parseFloat(ocrCropY.value) || 0, 0, 1);
+    OCR_SETTINGS.crop.w = clamp(parseFloat(ocrCropW.value) || 0.05, 0.05, 1);
+    OCR_SETTINGS.crop.h = clamp(parseFloat(ocrCropH.value) || 0.05, 0.05, 1);
+    OCR_SETTINGS.binThreshold = clamp(parseInt(ocrBinThreshold.value, 10) || 0, 0, 255);
+    OCR_SETTINGS.resizeW = clamp(parseInt(ocrResizeW.value, 10) || 40, 40, 512);
+    OCR_SETTINGS.maskThreshold = clamp(parseInt(ocrMaskThreshold.value, 10) || 0, 0, 255);
+    OCR_SETTINGS.raritySample.x = clamp(parseFloat(raritySampleX.value) || 0, 0, 1);
+    OCR_SETTINGS.raritySample.y = clamp(parseFloat(raritySampleY.value) || 0, 0, 1);
+    OCR_SETTINGS.raritySample.radius = clamp(parseInt(raritySampleRadius.value, 10) || 1, 1, 12);
+    OCR_SETTINGS.templateDiffThreshold = clamp(parseInt(templateDiffThreshold.value, 10) || 0, 0, 255);
+    OCR_SETTINGS.minDiffPixels = clamp(parseInt(minDiffPixels.value, 10) || 1, 1, 2000);
+    syncOcrControls();
+    rerunAllOcr();
+  };
+
+  for (const input of [
+    ocrCropX, ocrCropY, ocrCropW, ocrCropH, ocrBinThreshold, ocrResizeW, ocrMaskThreshold,
+    raritySampleX, raritySampleY, raritySampleRadius, templateDiffThreshold, minDiffPixels
+  ]) {
+    input.addEventListener("input", onChange);
+    input.addEventListener("change", onChange);
+  }
+
+  clearTemplateBtn.addEventListener("click", () => {
+    if (!confirm("登録済みの同一アイテム・グレード比較テンプレートをすべて削除しますか？")) return;
+    templateDB.length = 0;
+    save();
+    rerunAllOcr();
+  });
+}
+
+// ============================================================
+// Image load / paste
+// ============================================================
+const fileInput = document.getElementById("file");
+
+function loadImageFromFile(file) {
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  loadImage(url, () => URL.revokeObjectURL(url));
+}
+
+fileInput.onchange = e => {
+  const file = e.target.files && e.target.files[0];
+  loadImageFromFile(file);
+  fileInput.value = "";
+};
+
+document.addEventListener("paste", e => {
+  const items = e.clipboardData?.items || [];
+  for (const item of items) {
+    if (item.kind === "file" && item.type.startsWith("image")) {
+      loadImageFromFile(item.getAsFile());
+      e.preventDefault();
+      return;
+    }
+  }
+  const files = e.clipboardData?.files || [];
+  if (files.length && files[0].type.startsWith("image")) {
+    loadImageFromFile(files[0]);
+    e.preventDefault();
+  }
+});
+
+function loadImage(url, onLoadCleanup){
+  const img = new Image();
+  img.onload = () => {
+    srcCanvas.width = img.width;
+    srcCanvas.height = img.height;
+    srcCtx.drawImage(img, 0, 0);
+    detectFrames();
+    if (onLoadCleanup) onLoadCleanup();
+  };
+  img.src = url;
+}
+
+// ============================================================
+// Item / rarity identification
+// ============================================================
+function normalize(canvas){
+  const c = document.createElement("canvas");
+  c.width = c.height = 32;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  const m = canvas.width * 0.15;
+  ctx.drawImage(canvas, m, m, canvas.width - m * 2, canvas.height - m * 2, 0, 0, 32, 32);
+  return c;
+}
+
+function aHash(canvas){
+  const c = document.createElement("canvas");
+  c.width = c.height = 8;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(canvas, 0, 0, 8, 8);
+  const d = ctx.getImageData(0, 0, 8, 8).data;
+  const g = [];
+  for (let i = 0; i < d.length; i += 4) g.push((d[i] + d[i+1] + d[i+2]) / 3);
+  const avg = g.reduce((a,b) => a+b, 0) / 64;
+  return g.map(v => v > avg ? 1 : 0).join("");
+}
+
+function hamming(a,b){
+  let d = 0;
+  const len = Math.min(a.length, b.length);
+  for (let i = 0; i < len; i++) if (a[i] !== b[i]) d++;
+  return d + Math.abs(a.length - b.length);
+}
+
+function identifyItem(hash){
+  let best = null, score = 999;
+  for (const k in itemDB) {
+    const d = hamming(hash, itemDB[k]);
+    if (d < score) { score = d; best = k; }
+  }
+  return score <= 12 ? best : null;
+}
+
+function sampleRarityColor(canvas){
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const w = canvas.width, h = canvas.height;
+  const cx = clamp(Math.round(w * OCR_SETTINGS.raritySample.x), 0, w - 1);
+  const cy = clamp(Math.round(h * OCR_SETTINGS.raritySample.y), 0, h - 1);
+  const r0 = OCR_SETTINGS.raritySample.radius;
+  let r = 0, g = 0, b = 0, n = 0;
+
+  for (let y = cy - r0; y <= cy + r0; y++) {
+    for (let x = cx - r0; x <= cx + r0; x++) {
+      if (x < 0 || y < 0 || x >= w || y >= h) continue;
+      const d = ctx.getImageData(x, y, 1, 1).data;
+      r += d[0]; g += d[1]; b += d[2]; n++;
+    }
+  }
+  return { r: r / n, g: g / n, b: b / n };
+}
+
+function colorDist(a,b){
+  return Math.abs(a.r-b.r) + Math.abs(a.g-b.g) + Math.abs(a.b-b.b);
+}
+
+function identifyRarity(color){
+  let best = null, score = 999;
+  for (const r in rarityDB) {
+    const d = colorDist(color, rarityDB[r]);
+    if (d < score) { score = d; best = r; }
+  }
+  return score < 120 ? best : null;
+}
+
+// ============================================================
+// Template-based quantity extraction
+// ============================================================
+function findTemplates(itemName, rarity){
+  if (!itemName || !rarity) return [];
+  return templateDB.filter(t => t.itemName === itemName && t.rarity === rarity && t.dataUrl);
+}
+
+async function chooseBestTemplateCanvas(itemCanvas, itemName, rarity){
+  const templates = findTemplates(itemName, rarity);
+  if (!templates.length) return null;
+
+  let best = null;
+  let bestScore = Number.POSITIVE_INFINITY;
+  for (const t of templates) {
+    const tc0 = await loadCanvasFromDataUrl(t.dataUrl);
+    const tc = (tc0.width === itemCanvas.width && tc0.height === itemCanvas.height)
+      ? tc0
+      : resizeCanvas(tc0, itemCanvas.width, itemCanvas.height);
+    const score = templateDifferenceScore(itemCanvas, tc);
+    if (score < bestScore) {
+      bestScore = score;
+      best = tc;
+    }
+  }
+  return best;
+}
+
+function templateDifferenceScore(a, b){
+  const w = a.width, h = a.height;
+  const ad = a.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, w, h).data;
+  const bd = b.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, w, h).data;
+  let sum = 0;
+  for (let i = 0; i < ad.length; i += 16) { // sampling only
+    sum += Math.abs(ad[i] - bd[i]) + Math.abs(ad[i+1] - bd[i+1]) + Math.abs(ad[i+2] - bd[i+2]);
+  }
+  return sum;
+}
+
+function cropFallbackNumberArea(itemCanvas){
+  const w = itemCanvas.width, h = itemCanvas.height;
+  const rx = Math.floor(w * OCR_SETTINGS.crop.x);
+  const ry = Math.floor(h * OCR_SETTINGS.crop.y);
+  const rw = Math.max(1, Math.floor(w * OCR_SETTINGS.crop.w));
+  const rh = Math.max(1, Math.floor(h * OCR_SETTINGS.crop.h));
+  const c = document.createElement("canvas");
+  c.width = rw;
+  c.height = rh;
+  c.getContext("2d", { willReadFrequently: true }).drawImage(itemCanvas, rx, ry, rw, rh, 0, 0, rw, rh);
+  return { canvas: c, usedTemplate: false, diffPixels: 0 };
+}
+
+function extractQuantityByTemplateDiff(itemCanvas, templateCanvas){
+  if (!templateCanvas) return cropFallbackNumberArea(itemCanvas);
+
+  const w = itemCanvas.width, h = itemCanvas.height;
+  const srcCtx2 = itemCanvas.getContext("2d", { willReadFrequently: true });
+  const tplCtx = templateCanvas.getContext("2d", { willReadFrequently: true });
+  const src = srcCtx2.getImageData(0, 0, w, h);
+  const tpl = tplCtx.getImageData(0, 0, w, h);
+  const sd = src.data, td = tpl.data;
+
+  const diffCanvas = document.createElement("canvas");
+  diffCanvas.width = w;
+  diffCanvas.height = h;
+  const diffCtx = diffCanvas.getContext("2d", { willReadFrequently: true });
+  const out = diffCtx.createImageData(w, h);
+  const od = out.data;
+
+  let minX = w, minY = h, maxX = -1, maxY = -1, diffPixels = 0;
+  const th = OCR_SETTINGS.templateDiffThreshold;
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const diff = Math.abs(sd[i] - td[i]) + Math.abs(sd[i+1] - td[i+1]) + Math.abs(sd[i+2] - td[i+2]);
+      if (diff >= th) {
+        // 変化した画素だけを残す。数字以外のアイコン/背景は黒で消える。
+        od[i] = sd[i]; od[i+1] = sd[i+1]; od[i+2] = sd[i+2]; od[i+3] = 255;
+        minX = Math.min(minX, x); minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+        diffPixels++;
+      } else {
+        od[i] = 0; od[i+1] = 0; od[i+2] = 0; od[i+3] = 255;
+      }
+    }
+  }
+  diffCtx.putImageData(out, 0, 0);
+
+  if (diffPixels < OCR_SETTINGS.minDiffPixels || maxX < minX || maxY < minY) {
+    return cropFallbackNumberArea(itemCanvas);
+  }
+
+  const pad = OCR_SETTINGS.diffBoxPadding;
+  minX = clamp(minX - pad, 0, w - 1);
+  minY = clamp(minY - pad, 0, h - 1);
+  maxX = clamp(maxX + pad, 0, w - 1);
+  maxY = clamp(maxY + pad, 0, h - 1);
+
+  const cw = Math.max(1, maxX - minX + 1);
+  const ch = Math.max(1, maxY - minY + 1);
+  const crop = document.createElement("canvas");
+  crop.width = cw;
+  crop.height = ch;
+  crop.getContext("2d", { willReadFrequently: true }).drawImage(diffCanvas, minX, minY, cw, ch, 0, 0, cw, ch);
+  return { canvas: crop, usedTemplate: true, diffPixels };
+}
+
+function binarizeForOcr(canvas){
+  const w = canvas.width, h = canvas.height;
+  const scale = OCR_SETTINGS.resizeW / Math.max(1, w);
+  const tw = OCR_SETTINGS.resizeW;
+  const th = Math.max(20, Math.floor(h * scale));
+
+  const c = document.createElement("canvas");
+  c.width = tw;
+  c.height = th;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.fillStyle = "white";
+  ctx.fillRect(0, 0, tw, th);
+  ctx.drawImage(canvas, 0, 0, tw, th);
+
+  const img = ctx.getImageData(0, 0, tw, th);
+  const d = img.data;
+  const thres = OCR_SETTINGS.binThreshold;
+
+  for (let i = 0; i < d.length; i += 4) {
+    const lum = (d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114);
+    // 数字は明るい色で描かれる前提。OCR向けに「黒文字・白背景」へ変換。
+    const isDigit = lum >= thres;
+    d[i] = d[i+1] = d[i+2] = isDigit ? 0 : 255;
+    d[i+3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  return c;
+}
+
+async function ocrDigitsFromItem(itemInfo){
+  await ensureOcrWorker();
+
+  const templateCanvas = await chooseBestTemplateCanvas(itemInfo.canvas, itemInfo.itemName, itemInfo.rarity);
+  const extracted = extractQuantityByTemplateDiff(itemInfo.canvas, templateCanvas);
+  const bin = binarizeForOcr(extracted.canvas);
+
+  renderDebugCanvas(itemInfo.cropCanvas, extracted.canvas);
+  renderDebugCanvas(itemInfo.binCanvas, bin);
+
+  const { data } = await ocrWorker.recognize(bin);
+  const digits = cleanupDigits(data.text);
+  itemInfo.usedTemplate = extracted.usedTemplate;
+  itemInfo.diffPixels = extracted.diffPixels;
+  return digits;
+}
+
+// ============================================================
+// Detected item management
+// ============================================================
+const detectedItems = [];
+let autoCalcTimer = null;
+
+const itemNameMap = {
+  Wood: "wood",
+  Rope: "rope",
+  Fabric: "cloth",
+  Feather: "feather",
+  Leather: "leather",
+  Stone: "stone"
+};
+
+const rarityMap = {
+  Common: "common",
+  Uncommon: "uncommon",
+  Rare: "rare",
+  Epic: "epic",
+  Legendary: "legend"
+};
+
+function scheduleAutoCalculate(){
+  if (autoCalcTimer) clearTimeout(autoCalcTimer);
+  autoCalcTimer = setTimeout(() => { calculate(); }, 150);
+}
+
+function updateStockFromOcr(){
+  const totals = {};
+  for (const key of Object.values(itemNameMap)) totals[key] = { common:0, uncommon:0, rare:0, epic:0, legend:0 };
+
+  for (const item of detectedItems) {
+    const matKey = itemNameMap[item.itemName];
+    const rarityKey = rarityMap[item.rarity];
+    const qty = item.digits || 0;
+    if (matKey && rarityKey && qty > 0) totals[matKey][rarityKey] += qty;
+  }
+
+  for (const [matKey, rarityTotals] of Object.entries(totals)) {
+    for (const [rarityKey, qty] of Object.entries(rarityTotals)) {
+      const input = document.getElementById(`stock_${matKey}_${rarityKey}`);
+      if (input) input.value = qty;
+    }
+  }
+  scheduleAutoCalculate();
+}
+
+function rerunAllOcr(){
+  if (!detectedItems.length) return;
+  for (const item of detectedItems) {
+    item.label.textContent = `${item.itemName || "未登録"} / ${item.rarity || "?"} / OCR...`;
+    enqueueOcr(async () => {
+      const digits = await ocrDigitsFromItem(item);
+      item.digits = digits ? parseInt(digits, 10) : 0;
+      item.label.textContent = `${item.itemName || "未登録"} / ${item.rarity || "?"} / ${digits || "-"} ${item.usedTemplate ? "[差分]" : "[crop]"}`;
+      updateStockFromOcr();
+    });
+  }
+}
+
+// ============================================================
+// Square icon detection
+// ============================================================
+function detectFrames(){
+  result.innerHTML = "";
+  detectedItems.length = 0;
+
+  const w = srcCanvas.width, h = srcCanvas.height;
+  if (!w || !h) return;
+
+  const scale = 0.5;
+  const sw = Math.max(1, Math.floor(w * scale));
+  const sh = Math.max(1, Math.floor(h * scale));
+  const tmp = document.createElement("canvas");
+  tmp.width = sw;
+  tmp.height = sh;
+  const tctx = tmp.getContext("2d", { willReadFrequently: true });
+  tctx.drawImage(srcCanvas, 0, 0, sw, sh);
+
+  const img = tctx.getImageData(0, 0, sw, sh);
+  const g = new Uint8Array(sw * sh);
+  for (let i = 0; i < img.data.length; i += 4) {
+    g[i / 4] = (img.data[i] + img.data[i+1] + img.data[i+2]) / 3;
+  }
+
+  const edge = new Uint8Array(sw * sh);
+  for (let y = 1; y < sh; y++) {
+    for (let x = 1; x < sw; x++) {
+      const i = y * sw + x;
+      const dx = Math.abs(g[i] - g[i - 1]);
+      const dy = Math.abs(g[i] - g[i - sw]);
+      edge[i] = (dx + dy) > 25 ? 1 : 0;
+    }
+  }
+
+  const visited = new Uint8Array(sw * sh);
+  const boxes = [];
+
+  for (let i = 0; i < sw * sh; i++) {
+    if (!edge[i] || visited[i]) continue;
+
+    let minX = sw, minY = sh, maxX = 0, maxY = 0, count = 0;
+    const st = [i];
+    visited[i] = 1;
+
+    while (st.length) {
+      const p = st.pop();
+      const x = p % sw, y = (p / sw) | 0;
+      minX = Math.min(minX, x); minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+      count++;
+      for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= sw || ny >= sh) continue;
+        const ni = ny * sw + nx;
+        if (edge[ni] && !visited[ni]) {
+          visited[ni] = 1;
+          st.push(ni);
+        }
+      }
+    }
+
+    const bw = maxX - minX + 1;
+    const bh = maxY - minY + 1;
+    const side = Math.max(bw, bh);
+    const aspectOk = Math.abs(bw - bh) <= Math.max(8, side * 0.18);
+    const sizeOk = side >= 38 && side <= Math.min(sw, sh) * 0.28;
+    const densityOk = count >= side * 1.2;
+    if (aspectOk && sizeOk && densityOk) boxes.push({ minX, minY, maxX, maxY, side });
+  }
+
+  const filtered = suppressDuplicateBoxes(boxes).sort((a,b) => (a.minY - b.minY) || (a.minX - b.minX));
+  for (const b of filtered) createItem(b.minX, b.minY, b.maxX - b.minX + 1, b.maxY - b.minY + 1, scale);
+  updateStockFromOcr();
+}
+
+function suppressDuplicateBoxes(boxes){
+  const out = [];
+  for (const b of boxes) {
+    const cx = (b.minX + b.maxX) / 2;
+    const cy = (b.minY + b.maxY) / 2;
+    const duplicate = out.some(o => {
+      const ocx = (o.minX + o.maxX) / 2;
+      const ocy = (o.minY + o.maxY) / 2;
+      const dist = Math.hypot(cx - ocx, cy - ocy);
+      return dist < Math.max(b.side, o.side) * 0.35;
+    });
+    if (!duplicate) out.push(b);
+  }
+  return out;
+}
+
+// ============================================================
+// Item UI
+// ============================================================
+function createItem(x, y, w, h, scale){
+  // 正方形に寄せる。フレーム検出の揺れを吸収。
+  const side = Math.max(w, h);
+  const sx = Math.max(0, x - Math.floor((side - w) / 2));
+  const sy = Math.max(0, y - Math.floor((side - h) / 2));
+  const srcX = sx / scale;
+  const srcY = sy / scale;
+  const srcSide = side / scale;
+
+  const c = document.createElement("canvas");
+  c.width = Math.round(srcSide);
+  c.height = Math.round(srcSide);
+  c.getContext("2d", { willReadFrequently: true }).drawImage(srcCanvas, srcX, srcY, srcSide, srcSide, 0, 0, c.width, c.height);
+
+  const norm = normalize(c);
+  const hash = aHash(norm);
+  const itemName = identifyItem(hash);
+  const color = sampleRarityColor(c);
+  const rarity = identifyRarity(color);
+
+  const wrap = document.createElement("div");
+  wrap.className = "item";
+  wrap.appendChild(c);
+
+  const label = document.createElement("div");
+  label.className = "label";
+  label.textContent = `${itemName || "未登録"} / ${rarity || "?"} / OCR...`;
+  wrap.appendChild(label);
+
+  const debugWrap = document.createElement("div");
+  debugWrap.className = "ocr-debug";
+  const cropCanvas = document.createElement("canvas");
+  const binCanvas = document.createElement("canvas");
+  debugWrap.appendChild(cropCanvas);
+  debugWrap.appendChild(binCanvas);
+  wrap.appendChild(debugWrap);
+
+  const small = document.createElement("div");
+  small.className = "small";
+  small.textContent = "クリック: 登録/補正";
+  wrap.appendChild(small);
+
+  const itemInfo = {
+    canvas: c,
+    itemName,
+    rarity,
+    hash,
+    color,
+    label,
+    cropCanvas,
+    binCanvas,
+    digits: 0,
+    usedTemplate: false,
+    diffPixels: 0
+  };
+  detectedItems.push(itemInfo);
+
+  enqueueOcr(async () => {
+    const digits = await ocrDigitsFromItem(itemInfo);
+    itemInfo.digits = digits ? parseInt(digits, 10) : 0;
+    label.textContent = `${itemName || "未登録"} / ${rarity || "?"} / ${digits || "-"} ${itemInfo.usedTemplate ? "[差分]" : "[crop]"}`;
+    updateStockFromOcr();
+  });
+
+  wrap.onclick = () => openRegisterDialog(itemInfo);
+  result.appendChild(wrap);
+}
+
+function openRegisterDialog(itemInfo){
+  const mode = prompt(
+    "1: アイテム識別登録\n2: グレード色登録\n3: 同一アイテム・同一グレードの比較テンプレ登録\n\n数量抽出の精度を上げるには 3 を登録してください。",
+    "3"
+  );
+
+  if (mode === "1") {
+    const n = prompt("アイテム名", itemInfo.itemName || "");
+    if (n) {
+      itemDB[n] = itemInfo.hash;
+      itemInfo.itemName = n;
+      save();
+      rerunAllOcr();
+    }
+  }
+
+  if (mode === "2") {
+    const r = prompt("グレード名\n" + RARITIES.join(","), itemInfo.rarity || "");
+    if (RARITIES.includes(r)) {
+      rarityDB[r] = itemInfo.color;
+      itemInfo.rarity = r;
+      save();
+      rerunAllOcr();
+    }
+  }
+
+  if (mode === "3") {
+    const itemName = prompt("テンプレ登録するアイテム名", itemInfo.itemName || "");
+    if (!itemName) return;
+    const rarity = prompt("テンプレ登録するグレード名\n" + RARITIES.join(","), itemInfo.rarity || "");
+    if (!RARITIES.includes(rarity)) {
+      alert("グレード名が不正です。Common / Uncommon / Rare / Epic / Legendary から選んでください。");
+      return;
+    }
+    templateDB.push({
+      itemName,
+      rarity,
+      width: itemInfo.canvas.width,
+      height: itemInfo.canvas.height,
+      dataUrl: canvasToDataUrl(itemInfo.canvas),
+      createdAt: new Date().toISOString()
+    });
+    itemInfo.itemName = itemName;
+    itemInfo.rarity = rarity;
+    save();
+    rerunAllOcr();
+  }
+}
+
+// ============================================================
+// Optimizer
+// ============================================================
+const equipments = {
+  ハチェット: {木:8, 紐:0, 布:0, 羽:0, 皮:0, 石:6},
+  槍: {木:9, 紐:0, 布:0, 羽:0, 皮:0, 石:4},
+  弓: {木:7, 紐:0, 布:0, 羽:7, 皮:0, 石:3},
+  ボアレザー帽: {木:0, 紐:0, 布:0, 羽:7, 皮:5, 石:0},
+  皮ベルト: {木:0, 紐:5, 布:0, 羽:0, 皮:8, 石:3},
+  粗布のズボン: {木:0, 紐:6, 布:4, 羽:0, 皮:5, 石:0},
+  ヴァイキングシールド: {木:8, 紐:0, 布:0, 羽:0, 皮:0, 石:6},
+  長剣: {木:5, 紐:4, 布:0, 羽:0, 皮:0, 石:7},
+  ヴァイキングメット: {木:0, 紐:4, 布:0, 羽:0, 皮:0, 石:7},
+  オオカミ帽子: {木:0, 紐:0, 布:0, 羽:4, 皮:6, 石:0},
+  粗布のバンダナ: {木:0, 紐:5, 布:5, 羽:0, 皮:0, 石:0},
+  フェルト帽: {木:0, 紐:0, 布:4, 羽:0, 皮:6, 石:0},
+  亜麻の羽織: {木:0, 紐:0, 布:3, 羽:8, 皮:0, 石:0},
+  クローク: {木:0, 紐:0, 布:0, 羽:7, 皮:6, 石:0},
+  粗布の服: {木:0, 紐:4, 布:6, 羽:0, 皮:0, 石:0},
+  羊毛のショール: {木:0, 紐:4, 布:0, 羽:0, 皮:6, 石:0},
+  ショース: {木:0, 紐:0, 布:4, 羽:0, 皮:0, 石:6},
+  亜麻のズボン: {木:0, 紐:6, 布:5, 羽:0, 皮:0, 石:0},
+  粗布の脚絆: {木:0, 紐:6, 布:4, 羽:0, 皮:0, 石:0},
+  靴: {木:0, 紐:0, 布:0, 羽:5, 皮:6, 石:0}
+};
+
+const gradeFactor = { common:1, uncommon:4, rare:16, epic:64, legend:256 };
+let actualCounts = {};
+
+function updateHighlight(element) {
+  const target = parseInt(element.closest('tr').children[7].innerHTML, 10) || 0;
+  if (Number(element.value) >= target) element.closest('tr').classList.remove('highlight');
+  if (Number(element.value) < target && !element.closest('tr').classList.contains('highlight')) element.closest('tr').classList.add('highlight');
+}
+
+function getStockInWhite() {
+  const mats = ['wood','rope','cloth','feather','leather','stone'];
+  const stock = {木:0, 紐:0, 布:0, 羽:0, 皮:0, 石:0};
+  mats.forEach(mat => {
+    const values = {
+      common: parseInt(document.getElementById(`stock_${mat}_common`).value, 10) || 0,
+      uncommon: parseInt(document.getElementById(`stock_${mat}_uncommon`).value, 10) || 0,
+      rare: parseInt(document.getElementById(`stock_${mat}_rare`).value, 10) || 0,
+      epic: parseInt(document.getElementById(`stock_${mat}_epic`).value, 10) || 0,
+      legend: parseInt(document.getElementById(`stock_${mat}_legend`).value, 10) || 0
+    };
+    const whiteEquivalent = values.common * gradeFactor.common +
+      values.uncommon * gradeFactor.uncommon +
+      values.rare * gradeFactor.rare +
+      values.epic * gradeFactor.epic +
+      values.legend * gradeFactor.legend;
+    if (mat === "wood") stock.木 = whiteEquivalent;
+    if (mat === "rope") stock.紐 = whiteEquivalent;
+    if (mat === "cloth") stock.布 = whiteEquivalent;
+    if (mat === "feather") stock.羽 = whiteEquivalent;
+    if (mat === "leather") stock.皮 = whiteEquivalent;
+    if (mat === "stone") stock.石 = whiteEquivalent;
+  });
+  return stock;
+}
+
+function requiredWhite(recipe, mat){
+  // 青装備基準なので、青(16) + 緑(4) + 白(1)の従来計算を維持。
+  return recipe[mat] * 21;
+}
+
+function showRecipeTable(counts = {}) {
+  const table = document.getElementById('recipe_table');
+  table.innerHTML = "<tr><th>装備（青）</th><th>木</th><th>紐</th><th>布</th><th>羽</th><th>皮</th><th>石</th><th>作成回数（計算）</th><th>実際作成</th></tr>";
+
+  let totalCount = 0;
+  for (let r in equipments) {
+    if (!(r in actualCounts)) actualCounts[r] = 0;
+    const tr = document.createElement('tr');
+    const count = counts[r] || 0;
+    totalCount += count;
+    if (count > 0) tr.classList.add("highlight");
+
+    const tdActual = document.createElement('td');
+    const btnMinus = document.createElement('button');
+    btnMinus.textContent = "-";
+    btnMinus.className = "small-btn";
+    const input = document.createElement('input');
+    input.type = "number";
+    input.value = actualCounts[r];
+    input.className = "count-box";
+    const btnPlus = document.createElement('button');
+    btnPlus.textContent = "+";
+    btnPlus.className = "small-btn";
+
+    btnMinus.onclick = () => {
+      actualCounts[r] = Math.max(0, actualCounts[r] - 1);
+      input.value = actualCounts[r];
+      updateHighlight(input);
+    };
+    input.onchange = () => {
+      actualCounts[r] = parseInt(input.value, 10) || 0;
+      updateHighlight(input);
+    };
+    btnPlus.onclick = () => {
+      actualCounts[r]++;
+      input.value = actualCounts[r];
+      updateHighlight(input);
+    };
+    tdActual.appendChild(btnMinus);
+    tdActual.appendChild(input);
+    tdActual.appendChild(btnPlus);
+
+    tr.innerHTML = `<td>${r}</td>
+      <td>${requiredWhite(equipments[r], '木')}</td>
+      <td>${requiredWhite(equipments[r], '紐')}</td>
+      <td>${requiredWhite(equipments[r], '布')}</td>
+      <td>${requiredWhite(equipments[r], '羽')}</td>
+      <td>${requiredWhite(equipments[r], '皮')}</td>
+      <td>${requiredWhite(equipments[r], '石')}</td>
+      <td>${count}</td>`;
+    tr.appendChild(tdActual);
+    table.appendChild(tr);
+  }
+  document.getElementById('total_possible').textContent = totalCount;
+}
+
+async function calculate() {
+  const glpk = await GLPK();
+  const stock = getStockInWhite();
+  const equipNames = Object.keys(equipments);
+  const lp = { name:'EquipOptimization', objective:{ direction: glpk.GLP_MAX, name:'total', vars:[] }, subjectTo:[] };
+  equipNames.forEach(r => lp.objective.vars.push({ name:r, coef:1 }));
+
+  ['木','紐','布','羽','皮','石'].forEach(mat => {
+    const cons = { name: mat, vars: [], bnds:{ type: glpk.GLP_UP, ub: stock[mat], lb:0 } };
+    equipNames.forEach(r => cons.vars.push({ name:r, coef: requiredWhite(equipments[r], mat) }));
+    lp.subjectTo.push(cons);
+  });
+
+  let solved;
+  try { solved = await glpk.solve(lp, { msglev: glpk.GLP_MSG_OFF }); }
+  catch(err) { console.error(err); alert("計算中にエラーが発生しました。"); return; }
+
+  const counts = {};
+  equipNames.forEach(r => counts[r] = Math.floor(solved.result.vars[r] || 0));
+  showRecipeTable(counts);
+
+  const leftover = {...stock};
+  for (let r in counts) {
+    const count = counts[r];
+    for (let mat in equipments[r]) leftover[mat] -= requiredWhite(equipments[r], mat) * count;
+  }
+  const ul = document.getElementById('leftover_list');
+  ul.innerHTML = '';
+  for (let mat in leftover) {
+    const li = document.createElement('li');
+    li.textContent = `${mat}: ${leftover[mat]}`;
+    ul.appendChild(li);
+  }
+
+  const countBox = Array.from(document.getElementsByClassName('count-box'));
+  countBox.forEach(input => input.value = 0);
+  for (let r in actualCounts) actualCounts[r] = 0;
+}
+
+// ============================================================
+// Startup
+// ============================================================
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('calculateBtn').addEventListener('click', calculate);
+  syncOcrControls();
+  attachOcrControlEvents();
+  updateDBView();
+  showRecipeTable();
+});
+</script>
+
+</body>
+</html>
